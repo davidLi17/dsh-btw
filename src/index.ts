@@ -7,19 +7,14 @@ import { PERSONA_PREFIX_SECTION } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { CLOSE_COMMAND, MAX_QUESTION_LENGTH, parseRequest, questionWithReference, RUN_COMMAND } from './shared'
 import { DEFAULT_TIMEOUT_MS, SideJobs } from './server/jobs'
-import { createAnswerOnlyGuard, identityOfFromContext } from './server/tool-guard'
 import { translate } from './locales'
 import { hideInternalCommands } from './server/command-visibility'
 
 export const name = 'michengai-btw'
 export const inject = ['commands', 'subagents', 'tools']
 
-interface GuardedAgent {
+interface SideAgent {
   ctx?: {
-    tools: {
-      guard(guard: ReturnType<typeof createAnswerOnlyGuard>): () => void | Promise<void>
-      restrict(filter: { allow?: readonly string[]; deny?: readonly string[] }): () => void
-    }
     systemPrompt: {
       section(spec: { name: string; order: number; text: string }): () => void
       getSectionOrder(name: string): number
@@ -30,39 +25,6 @@ interface GuardedAgent {
 /** 宿主命令只负责接入与身份绑定，不创建 HTTP 或持久侧聊接口。 */
 export function apply(ctx: Context): void {
   ctx.effect(() => hideInternalCommands(ctx.commands))
-  const labels = new Set<string>()
-  // 保护挂在子代理自己的上下文上，随子代理释放，不借用宿主根 fiber。
-  // dsh-tui 会拒绝插件激活期间的 root.effect / root.events。
-  const protection = createAnswerOnlyGuard(labels, identityOfFromContext(ctx))
-  const releasePluginGuard = ctx.tools.guard(protection)
-  const childGuards = new WeakMap<object, () => void | Promise<void>>()
-  const arm = (agent: GuardedAgent) => {
-    protection.own(agent)
-    if (!agent.ctx || childGuards.has(agent)) return
-    childGuards.set(agent, agent.ctx.tools.guard(protection))
-  }
-  const releaseChild = async (agent: object | undefined) => {
-    if (!agent) return
-    const release = childGuards.get(agent)
-    childGuards.delete(agent)
-    await release?.()
-  }
-  const stopWatch = ctx.on('session/event', (session, event) => protection.recognize(session, event))
-  const activeLabels = new Map<string, number>()
-  const retainLabel = (l: string) => {
-    activeLabels.set(l, (activeLabels.get(l) ?? 0) + 1)
-    labels.add(l)
-  }
-  const releaseLabel = (l: string) => {
-    const count = (activeLabels.get(l) ?? 1) - 1
-    if (count <= 0) {
-      activeLabels.delete(l)
-      labels.delete(l)
-    } else {
-      activeLabels.set(l, count)
-    }
-  }
-
   const jobs = new SideJobs(async request => {
     // 0.2.1-rc.1 起只有 startActivation；0.2.0-rc.1 与 0.2.0-rc.2 仍只有 start。
     const provider = ctx.subagents.getProvider('fork')
@@ -71,8 +33,8 @@ export function apply(ctx: Context): void {
       throw new Error(t('error.provider'))
     }
     const label = t('agent.name')
-    retainLabel(label)
     const promptText = `${t('agent.promptPrefix')}\n\n${request.question}`
+    // Reuse the host fork/tool runtime; do not override its permissions or approvals.
     const subagents = ctx.subagents as unknown as {
       startActivation?: (spec: {
         provider: string
@@ -86,80 +48,65 @@ export function apply(ctx: Context): void {
         parent: Agent
         label: string
         signal: AbortSignal
-        toolFilter: { allow: readonly string[] }
         persona: string
         prompt: readonly { type: string; text: string }[]
       }) => Promise<{ result: Promise<{ stopReason: string; output: readonly { type: string; text?: string }[] }>; localAgent?: object; dispose(): Promise<void> }>
     }
     if (typeof subagents.startActivation === 'function') {
       const childId = SessionId(globalThis.crypto.randomUUID())
-      let childAgent: object | undefined
-      try {
-        const stopCreated = ctx.on('agent/created', ({ agent }) => {
-          if (agent.id !== childId) return undefined
-          childAgent = agent
-          arm(agent as GuardedAgent)
-          const scoped = agent as GuardedAgent
-          if (scoped.ctx?.systemPrompt) {
-            scoped.ctx.systemPrompt.section({
-              name: PERSONA_PREFIX_SECTION,
-              order: scoped.ctx.systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX'),
-              text: t('agent.persona'),
-            })
-          }
-          if (scoped.ctx?.tools) scoped.ctx.tools.restrict(request.toolFilter)
-          return undefined
-        })
-        let activation
-        try {
-          activation = await subagents.startActivation({
-            provider: 'fork',
-            label,
-            childId,
-            request: {
-              parent: request.context as Agent,
-              prompt: [{ type: 'text', text: promptText }],
-            },
-            signal: request.signal,
-            delivery: 'caller',
+      const stopCreated = ctx.on('agent/created', ({ agent }) => {
+        if (agent.id !== childId) return undefined
+        const scoped = agent as SideAgent
+        if (scoped.ctx?.systemPrompt) {
+          scoped.ctx.systemPrompt.section({
+            name: PERSONA_PREFIX_SECTION,
+            order: scoped.ctx.systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX'),
+            text: t('agent.persona'),
           })
-        } finally {
-          stopCreated()
         }
-        return {
-          result: activation.result,
-          dispose: async () => {
-            try { await activation.dispose() }
-            finally { await releaseChild(childAgent); releaseLabel(label) }
-          },
-        }
-      } catch (error) { releaseLabel(label); throw error }
-    }
-    if (typeof subagents.start !== 'function') {
-      releaseLabel(label)
-      throw new Error(t('error.provider'))
-    }
-    try {
-      const run = await subagents.start('fork', {
-        parent: request.context as Agent,
-        label,
-        signal: request.signal,
-        toolFilter: request.toolFilter,
-        persona: t('agent.persona'),
-        prompt: [{ type: 'text', text: promptText }],
+        return undefined
       })
-      if (run.localAgent) arm(run.localAgent)
+      let activation
+      try {
+        activation = await subagents.startActivation({
+          provider: 'fork',
+          label,
+          childId,
+          request: {
+            parent: request.context as Agent,
+            prompt: [{ type: 'text', text: promptText }],
+          },
+          signal: request.signal,
+          delivery: 'caller',
+        })
+      } finally {
+        stopCreated()
+      }
       return {
-        result: run.result,
+        result: activation.result,
         dispose: async () => {
-          try { await run.dispose() }
-          finally { await releaseChild(run.localAgent); releaseLabel(label) }
+          await activation.dispose()
         },
       }
-    } catch (error) { releaseLabel(label); throw error }
+    }
+    if (typeof subagents.start !== 'function') {
+      throw new Error(t('error.provider'))
+    }
+    const run = await subagents.start('fork', {
+      parent: request.context as Agent,
+      label,
+      signal: request.signal,
+      persona: t('agent.persona'),
+      prompt: [{ type: 'text', text: promptText }],
+    })
+    return {
+      result: run.result,
+      dispose: async () => {
+        await run.dispose()
+      },
+    }
   }, DEFAULT_TIMEOUT_MS, {
     onError: error => ctx.logger.warn(error),
-    onIdle: async () => { stopWatch(); await releasePluginGuard() },
   })
   ctx.effect(() => () => jobs.dispose())
 

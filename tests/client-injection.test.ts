@@ -92,7 +92,7 @@ it('真实 Cordis 依赖检查下可通过官方指令目录发送旁问', async
     expect(english[1]).toMatchObject({
       name: 'btw',
       label: 'Side question',
-      description: 'Answer from current context without running tools',
+      description: 'Answer in context, using host tools when needed',
       hint: 'Side question',
     })
     expect(english[1]?.icon).toEqual(expect.any(Function))
@@ -101,7 +101,7 @@ it('真实 Cordis 依赖检查下可通过官方指令目录发送旁问', async
     expect(chinese[1]).toMatchObject({
       name: 'btw',
       label: '旁问',
-      description: '根据当前上下文回答，不执行工具',
+      description: '结合上下文回答，按需使用宿主工具',
       hint: '旁问内容',
     })
     expect(injectedStyles).toHaveLength(1)

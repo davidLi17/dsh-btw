@@ -18,6 +18,10 @@
 
 > DSH BTW is a community-maintained DeepSeek Harness plugin, not an official DeepSeek AI product. Type `/btw your question` in the current conversation to get a context-aware answer in an independent bubble without interrupting the main task. Supports DSH Web and desktop apps that include DSH Web. From `1.0.0`, hosts outside the supported list are rejected by the version gate and the plugin will not run; installed configuration and main-conversation records are kept.
 
+## Fork behavior
+
+This fork removes BTW’s **Add to conversation** selection action while keeping **Ask BTW** and `/btw`. Side questions may use tools exposed by the host fork provider, subject to the host’s existing permissions, sandbox and approval flow. Inherited conversation and quotations remain background, not authorization to continue the main task. In DSH 0.2.1-rc.2, delegated agents have a fixed permission scope: tools requiring new approval are rejected by the host, not escalated through a new approval popup. The original answer-only descriptions below describe upstream behavior, not this fork. Rebuild and commit `lib` when changing source.
+
 ## Features
 
 - **Context-aware questions**: explain concepts, recap conclusions, or ask a quick question about the current conversation.

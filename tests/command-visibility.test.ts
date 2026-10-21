@@ -61,7 +61,7 @@ it.each(runtimeRoots)('真实 RPC 目录隐藏内部命令且执行与卸载正�
     expect(ctx.commands.list(agent).map(item => item.name)).toEqual(['btw', 'other'])
     const listed = await listRemote() as { name: string; description: string }[]
     expect(listed.map(item => item.name)).toEqual(['btw', 'other'])
-    expect(listed.find(item => item.name === 'btw')?.description).toBe('根据当前上下文回答，不执行工具')
+    expect(listed.find(item => item.name === 'btw')?.description).toBe('结合上下文回答，按需使用宿主工具')
     for (const line of [`/${RUN_COMMAND} ${JSON.stringify({ id: 'request01', question: '你好' })}`, `/${CLOSE_COMMAND} request01`]) {
       expect((await gateway.invoke({ namespace: 'commands', method: 'execute', args: { agentId: 'main', line, ...attachments }, peer, signal: new AbortController().signal }) as { result?: { kind?: string } })?.result?.kind).toBe('success')
     }

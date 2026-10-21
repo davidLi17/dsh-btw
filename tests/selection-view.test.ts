@@ -11,7 +11,6 @@ let root: Root
 let scope: HTMLDivElement
 let mount: HTMLDivElement
 let store: BubbleStore
-const add = vi.fn()
 const run = vi.fn(async () => ({ kind: 'success' as const, text: '引用解释' }))
 const close = vi.fn(async () => ({ kind: 'success' as const, text: '' }))
 
@@ -35,10 +34,10 @@ beforeEach(async () => {
   scope.append(seat)
   document.body.append(scope)
   root = createRoot(mount)
-  run.mockClear(); close.mockClear(); add.mockClear()
+  run.mockClear(); close.mockClear()
   store = new BubbleStore({ run, close })
   await act(async () => root.render(React.createElement(React.Fragment, null,
-    React.createElement(SelectionAsk, { store, sessionId: 'session-a', t: translate(), addToConversation: add }),
+    React.createElement(SelectionAsk, { store, sessionId: 'session-a', t: translate() }),
     React.createElement(BubbleDock, { store, sessionId: 'session-a', t: translate() }))))
 })
 afterEach(async () => {
@@ -143,10 +142,11 @@ it('正文滚动、窗口失焦和隐藏会话关闭菜单，已打开的提问�
   expect(run).not.toHaveBeenCalled()
 })
 
-it('添加引用不发送，右键保持原生，侧边栏选区不触发正文工具条', async () => {
+it('仅显示旁问入口，不添加引用；右键保持原生，侧边栏不触发工具条', async () => {
   await open()
-  await click('添加到对话')
-  expect(add).toHaveBeenCalledWith('引用中的原始正文')
+  expect(mount.querySelector('.btw-selection-menu')?.textContent).toBe('旁问')
+  expect(mount.textContent).not.toContain('添加到对话')
+  await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   expect(run).not.toHaveBeenCalled()
   expect(mount.querySelector<HTMLElement>('dialog, .btw-selection-menu')).toBeNull()
   const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
@@ -176,7 +176,7 @@ it('Escape 完整按键不重开，普通按键不触发，键盘选区释放 Sh
   await act(async () => { p.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true })) })
   expect(mount.querySelector('.btw-selection-menu')).toBeNull()
   await act(async () => { p.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift', bubbles: true })) })
-  expect(document.activeElement?.textContent).toBe('添加到对话')
+  expect(document.activeElement?.textContent).toBe('旁问')
 })
 
 it('没有 Popover API 时降级为普通浮层，仍能打开旁问', async () => {

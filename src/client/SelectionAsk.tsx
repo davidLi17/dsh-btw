@@ -3,19 +3,10 @@ import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { BubbleStore } from './bubbles'
 import type { BtwTranslate } from '../locales'
 import { MAX_QUESTION_LENGTH, MAX_REFERENCE_LENGTH } from '../shared'
-import { QuoteDock } from './QuoteDock'
-import type { QuoteStore } from './quotes'
-import { captureSelection, captureSelectionDetails, type CapturedSelectionDetails } from './selection'
-
-interface DraftInput {
-  state: { getSnapshot(): { draft: string; phase: string } }
-  setDraft(text: string): void
-  focus?(): void
-}
+import { captureSelectionDetails } from './selection'
 
 interface SelectionDraft {
   reference: string
-  details?: CapturedSelectionDetails
   x: number
   y: number
   bottom: number
@@ -26,18 +17,12 @@ interface SelectionDraft {
 /** 只接管会话正文选区；非模态 popover 不抢选区，顶层避免滚动裁切。 */
 export function SelectionAsk({
   store,
-  quoteStore,
   sessionId,
   t,
-  input,
-  addToConversation,
 }: {
   store: BubbleStore
-  quoteStore?: QuoteStore
   sessionId: string
   t: BtwTranslate
-  input?: DraftInput
-  addToConversation?: (reference: string) => void
 }): React.JSX.Element {
   const anchor = useRef<HTMLSpanElement>(null)
   const menu = useRef<HTMLDivElement | null>(null)
@@ -72,7 +57,6 @@ export function SelectionAsk({
       setError('')
       setDraft({
         reference: details.text,
-        details,
         x: rect.left + rect.width / 2,
         y: rect.top,
         bottom: rect.bottom,
@@ -160,32 +144,9 @@ export function SelectionAsk({
     }
   }
 
-  const add = () => {
-    if (!draft) return
-    try {
-      if (quoteStore && draft.details) {
-        quoteStore.addQuote(sessionId, {
-          text: draft.details.text,
-          role: draft.details.role,
-          turnIndex: draft.details.turnIndex,
-          anchorElement: draft.details.element,
-        })
-      } else if (quoteStore) {
-        quoteStore.addQuote(sessionId, {
-          text: draft.reference,
-        })
-      }
-      addToConversation?.(draft.reference)
-      setDraft(undefined)
-    } catch (issue) {
-      setError(issue instanceof Error ? issue.message : String(issue))
-    }
-  }
-
   return (
     <>
       <span ref={anchor} hidden />
-      {quoteStore && input && <QuoteDock store={quoteStore} sessionId={sessionId} t={t} input={input} />}
       {draft && !draft.form && (
         <div
           ref={menu}
@@ -194,7 +155,6 @@ export function SelectionAsk({
           aria-label={t('selection.ask')}
           onMouseDown={event => event.preventDefault()}
         >
-          <button type="button" onClick={add}>{t('selection.add')}</button>
           <button type="button" onClick={() => setDraft({ ...draft, form: true })}>{t('selection.btw')}</button>
         </div>
       )}

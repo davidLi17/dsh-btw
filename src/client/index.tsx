@@ -14,7 +14,6 @@ import { MessageCircle } from 'lucide-react'
 import { CLOSE_COMMAND, RUN_COMMAND, type SideResult } from '../shared'
 import { BubbleStore, SideRequestNotStartedError } from './bubbles'
 import { BubbleDock } from './BubbleView'
-import { QuoteStore } from './quotes'
 import { SelectionAsk } from './SelectionAsk'
 import { CSS } from './styles'
 import { en, zh, NS, normalizeLocale, type BtwTranslate } from '../locales'
@@ -135,7 +134,6 @@ export function apply(ctx: Context): void {
     run: (session, id, question, signal, reference) => execute(session, `/${RUN_COMMAND} ${JSON.stringify({ id, question, reference, locale: normalizeLocale(t('locale.id')) })}`, signal),
     close: (session, id) => execute(session, `/${CLOSE_COMMAND} ${id}`),
   }, t)
-  const quoteStore = new QuoteStore()
 
   const claim = (sessionId: SessionId): PickOutcome => ({ claim: {
     name: 'btw', token: '/btw ', get hint() { return t('command.hint') },
@@ -163,8 +161,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => store.dispose())
 
   function Dock(props: PropsRuntime<'conversation.input.dock'> & { t: BtwTranslate }): React.JSX.Element {
-    const session = (ctx.get('sessions') as unknown as ISessions).scope(props.session.sessionId)
-    return <>{!props.session.subagent && !isSubagent(props.session.sessionId) && <SelectionAsk key={props.session.sessionId} store={store} quoteStore={quoteStore} sessionId={props.session.sessionId} t={props.t} input={session ? ctx.conversation.input.for(session) : undefined} addToConversation={() => {}} />}<BubbleDock store={store} sessionId={props.session.sessionId} t={props.t} /></>
+    return <>{!props.session.subagent && !isSubagent(props.session.sessionId) && <SelectionAsk key={props.session.sessionId} store={store} sessionId={props.session.sessionId} t={props.t} />}<BubbleDock store={store} sessionId={props.session.sessionId} t={props.t} /></>
   }
   slots.inject('conversation.input.dock', () => slots.register({ name: 'conversation.input.dock', id: 'michengai-btw', order: -50, locale: NS }, Dock))
   slots.inject('conversation.chat.commandview', () => {

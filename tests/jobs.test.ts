@@ -55,12 +55,12 @@ describe('一次性旁问生命周期', () => {
     expect(jobs.size).toBe(0)
   })
 
-  it('正常完成后释放子代理，强制空工具白名单', async () => {
+  it('正常完成后释放子代理，不覆盖宿主工具权限', async () => {
     const dispose = vi.fn(async () => {})
     const start = vi.fn<StartChild>(async () => ({ result: Promise.resolve(answer), dispose }))
     const jobs = new SideJobs(start)
     expect(await jobs.ask('parent', 'request01', '为什么？')).toEqual({ kind: 'success', text: '答案' })
-    expect(start.mock.calls[0]?.[0].toolFilter).toEqual({ allow: [] })
+    expect(start.mock.calls[0]?.[0]).not.toHaveProperty('toolFilter')
     expect(dispose).toHaveBeenCalledTimes(1)
     expect(jobs.size).toBe(0)
   })
