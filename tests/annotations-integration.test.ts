@@ -56,7 +56,7 @@ it('同一选区工具栏复用批注发送、回跳及 BTW 文本快照，无�
     await select()
     expect(document.querySelectorAll('.dca-menu')).toHaveLength(1)
     expect(document.querySelectorAll('.btw-selection-menu')).toHaveLength(0)
-    expect(document.querySelector('.dca-menu')!.textContent).toBe('添加到对话BTW 旁问')
+    expect(document.querySelector('.dca-menu')!.textContent).toBe('添加到对话旁问')
     await act(async () => (document.querySelector('.dca-menu button') as HTMLButtonElement).click())
     expect(document.querySelector('.dca-editor textarea')).not.toBeNull()
     const encoded = await source.codec.serialize(state.occurrences[0].ref, new AbortController().signal)

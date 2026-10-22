@@ -168,7 +168,7 @@ function Assistant({ inner: Inner, dca: face, btw, ...props }) {
     </div>
     {selection && !open && <Float anchor={anchor} align="center" className="dca-menu" onDismiss={close}>
       <button onClick={() => { const note = face.add(selection.selector); if (note) { setOpen({ note, compact: true }); window.getSelection()?.removeAllRanges(); } }}>添加到对话</button>
-      {!btw.isSubagent(face.sessionId) && <button onClick={() => { setBtwReference(selection.selector.quote); close(); }}>BTW 旁问</button>}
+      {!btw.isSubagent(face.sessionId) && <button onClick={() => { setBtwReference(selection.selector.quote); close(); }}>{btw.t('selection.btw')}</button>}
     </Float>}
     {btwReference !== null && <SelectionAsk store={btw.store} sessionId={face.sessionId} t={btw.t} initialReference={btwReference} onDismiss={() => setBtwReference(null)} />}
     {open && active && <Editor key={active.id} note={active} face={face} anchor={anchor} close={close} initiallyExpanded={!open.compact}

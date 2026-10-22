@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "BTW",
-    "description": "基于当前上下文回答，独立气泡，不执行工具。"
+    "title": "原文批注与旁问",
+    "description": "支持原生 Codex 原文批注，并可通过独立气泡进行旁问。由 davidLi17 整合修改。"
   }
 }

@@ -1,13 +1,17 @@
-# 原文批注 + BTW 旁问整合版（1.1.0）
+# 原文批注与旁问（1.1.1）
 
-安装本 Fork 即包含两项功能：在助手回复选中文字，同一工具栏选择「添加到对话」或「BTW 旁问」。
+安装本 Fork 即包含两项功能：在助手回复选中文字，同一工具栏选择「添加到对话」或「旁问」。
 - 添加到对话：复用 Codex annotations 的编号锚点、可选评论、多条汇总发送和原文回跳。
-- BTW 旁问：原独立气泡、上下文继承与宿主工具调用保持不变；不会把批注自动发送到主对话。
+- 旁问：原独立气泡、上下文继承与宿主工具调用保持不变；不会把批注自动发送到主对话。
 - 安装前请关闭独立的 dsh-codex-annotations，避免重复工具栏和重复处理。不要同时启用两份。
 - 原批注 localStorage key 和协议未改；同一客户端、同一站点、同一会话的数据可继续读取。不要清除站点存储。跨客户端不自动迁移。
 - 安装地址：github:davidLi17/dsh-btw#main
 
 批注功能复用自 [dsh-codex-annotations](https://github.com/deepseek-harness-plugins/dsh-codex-annotations) 提交 9d405b1888ebbef1609e4b2f7ef6166f29012fcb（0.2.14）。源码位于 src/annotations，遵循 MIT，完整版权声明见 ANNOTATIONS-LICENSE；原 BTW 保持 Apache-2.0。
+
+## 维护与来源
+
+由 davidLi17 整合修改。旁问功能前身为 MichengAI 的 BTW 插件，原文批注复用 deepseekharness-plugin contributors 的 Codex annotations；原作者归属与许可证保留。为让现有安装正常更新，技术包名 @michengai/dsh-btw、组件 ID michengai-btw 和 /btw 命令保持兼容，并不代表本整合版的展示名称或维护者。
 
 ## 使用
 

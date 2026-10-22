@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.1] - 2026-10-22
+
+- 修正插件页中英文展示名和描述，统一「原文批注与旁问」，标注 davidLi17 整合修改；保留原作者归属、技术身份及 /btw 命令兼容。
+
 ## [1.1.0] - 2026-10-22
 
 - Integrate Codex annotations 0.2.14 (MIT) with the existing BTW side-question toolbar. Preserve annotation storage, model projection, native reference sending, navigation and existing host tool permissions.

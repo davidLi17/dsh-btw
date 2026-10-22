@@ -17,3 +17,17 @@ it('英文界面不会改写中文模型回答', async () => {
   const jobs = new SideJobs(async () => ({ result: Promise.resolve({ stopReason: 'completed', output: [{ type: 'text', text: '原始回答' }] }), dispose: async () => {} }))
   expect((await jobs.ask('session', 'request02', '你好', undefined, undefined, 'en')).text).toBe('原始回答')
 })
+
+it('插件元数据解释两项功能，标注整合维护者并保留升级身份', async () => {
+  const { readFileSync } = await import('node:fs')
+  const read = (path: string) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
+  const zh = read('../locale/zh.json'), en = read('../locale/en.json'), pkg = read('../package.json')
+  expect(zh.meta.title).toBe('原文批注与旁问')
+  expect(en.meta.title).toBe('Annotations & Side Ask')
+  expect(zh.meta.description).toContain('davidLi17')
+  expect(zh.meta.description).toContain('Codex 原文批注')
+  expect(zh.meta.description).not.toContain('不执行工具')
+  expect(en.meta.description).not.toContain('without running tools')
+  expect(pkg.author.name).toBe('davidLi17（整合修改）')
+  expect(pkg.name).toBe('@michengai/dsh-btw')
+})
