@@ -36,7 +36,7 @@ async function setup() {
   const loader = { load: (entry: { factory: (require: typeof fallback) => typeof clientPlugin }) => {
     implementation = entry.factory(safeRequire)
   } }
-  vi.stubGlobal('window', { localStorage: { getItem: () => null, setItem: () => {} }, __ModuleLoader__: loader })
+  vi.stubGlobal('window', { addEventListener: () => {}, removeEventListener: () => {}, localStorage: { getItem: () => null, setItem: () => {} }, __ModuleLoader__: loader })
   vi.stubGlobal('document', {
     createElement: () => ({ dataset: {}, remove: () => {} }),
     head: { append: () => {} },
@@ -46,9 +46,12 @@ async function setup() {
     subagentAddress: (id: string) => addresses.has(id) ? { childSessionId: id } : undefined,
     list: { getSnapshot: () => ({ byId: rows }) },
   })
+  ctx.provide('uiConversation', {})
+  ctx.provide('inputTriggers', { registerSource: () => () => {} })
   ctx.provide('conversation', { input: { for: () => ({}) } })
   ctx.provide('commandUi', commands)
   ctx.provide('slots', {
+    entries: () => [],
     inject: (_name: string, register: () => void) => { register(); return () => {} },
     register: (spec: { name: string }, component: unknown) => {
       if (spec.name === 'conversation.input.dock') dock = component as Dock

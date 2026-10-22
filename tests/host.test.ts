@@ -6,7 +6,7 @@ import type { Context as ContextType } from '@deepseek-ai/cordis'
 import type { ToolRuntime as RuntimeType } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
-import { apply } from '../src/index'
+import { apply, inject } from '../src/index'
 import { RUN_COMMAND } from '../src/shared'
 
 // 默认验证锁文件中的宿主版本；允许显式指定旧版依赖图做兼容回归。
@@ -28,6 +28,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
   it('根 fiber 拒绝 effect 时仍能激活并注册 btw', async () => {
     const { Context, ToolRuntime } = await load()
     const ctx = new Context()
+    ctx.provide('sessions', { list: () => [] })
     ctx.provide('systemPrompt', { tools: () => () => {}, section: () => () => {}, getSectionOrder: () => 0 })
     new ToolRuntime(ctx)
     const commands = new Map<string, CommandDefinition>()
@@ -39,7 +40,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
       if (label === 'tools.guard()') throw new Error('dsh-tui: root.effect is unavailable from a plugin activation')
       return rootEffect(execute, label)
     }
-    const plugin = ctx.plugin(apply)
+    const plugin = ctx.plugin({ apply, inject })
     try {
       await plugin.await()
     } catch (error) {
@@ -53,6 +54,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
   it('subagents.start 保留独立角色且不覆盖宿主工具权限', async () => {
     const { Context, ToolRuntime, createScope } = await load()
     const ctx = new Context()
+    ctx.provide('sessions', { list: () => [] })
     ctx.provide('systemPrompt', { tools: () => () => {}, section: () => () => {}, getSectionOrder: () => 0 })
     new ToolRuntime(ctx)
     const commands = new Map<string, CommandDefinition>()
@@ -81,7 +83,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
       start: startLegacy,
     })
 
-    const plugin = ctx.plugin(apply)
+    const plugin = ctx.plugin({ apply, inject })
     await plugin.await()
 
     const outcome = await commands.get(RUN_COMMAND)!.handler({
@@ -109,6 +111,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
   it('插件卸载等待子代理清理，不注册额外工具保护', async () => {
     const { Context } = await load()
     const ctx = new Context()
+    ctx.provide('sessions', { list: () => [] })
     const commands = new Map<string, CommandDefinition>()
     let protectedNow = false
     let finishCleanup!: () => void
@@ -119,7 +122,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
       getProvider: () => ({ inheritsParentContext: true, capabilities: { agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: true } }),
       start: async () => ({ result: new Promise(() => {}), dispose: () => { cleanupStarted = true; return new Promise<void>(resolve => { finishCleanup = resolve }) } }),
     })
-    const plugin = ctx.plugin(apply)
+    const plugin = ctx.plugin({ apply, inject })
     await plugin.await()
     const answer = commands.get(RUN_COMMAND)!.handler({ agent: { session: { header: { id: 'main' } } }, rawInput: JSON.stringify({ id: 'request-123', question: '问题' }), signal: new AbortController().signal } as never)
     await Promise.resolve()
@@ -136,6 +139,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
   it('卸载清理挂起时按时退出，宿主保护不被插件释放', async () => {
     const { Context, ToolRuntime, createScope } = await load()
     const ctx = new Context()
+    ctx.provide('sessions', { list: () => [] })
     ctx.provide('systemPrompt', { tools: () => () => {}, section: () => () => {}, getSectionOrder: () => 0 })
     new ToolRuntime(ctx)
     const commands = new Map<string, CommandDefinition>()
@@ -154,7 +158,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
         return { result: new Promise(() => {}), localAgent: child, dispose }
       },
     })
-    const plugin = ctx.plugin(apply)
+    const plugin = ctx.plugin({ apply, inject })
     await plugin.await()
     vi.useFakeTimers()
     const answer = commands.get(RUN_COMMAND)!.handler({ agent: { session: { header: { id: 'main' } } }, rawInput: JSON.stringify({ id: 'request-123', question: '问题' }), signal: new AbortController().signal } as never)
@@ -189,6 +193,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
   it('卸载时启动仍挂起，迟到句柄被清理且无额外保护', async () => {
     const { Context } = await load()
     const ctx = new Context()
+    ctx.provide('sessions', { list: () => [] })
     const commands = new Map<string, CommandDefinition>()
     let protectedNow = false
     let finishStart!: (run: { result: Promise<unknown>; localAgent?: object; dispose: () => Promise<void> }) => void
@@ -198,7 +203,7 @@ describe(`DSH ${runtimeVersion} 真实运行时`, () => {
       getProvider: () => ({ inheritsParentContext: true, capabilities: { agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: true } }),
       start: () => new Promise(resolve => { finishStart = resolve as typeof finishStart }),
     })
-    const plugin = ctx.plugin(apply)
+    const plugin = ctx.plugin({ apply, inject })
     await plugin.await()
     vi.useFakeTimers()
     const answer = commands.get(RUN_COMMAND)!.handler({ agent: { session: { header: { id: 'main' } } }, rawInput: JSON.stringify({ id: 'request-123', question: '问题' }), signal: new AbortController().signal } as never)

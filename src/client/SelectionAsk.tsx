@@ -19,28 +19,34 @@ export function SelectionAsk({
   store,
   sessionId,
   t,
+  initialReference,
+  onDismiss,
 }: {
   store: BubbleStore
   sessionId: string
   t: BtwTranslate
+  initialReference?: string
+  onDismiss?: () => void
 }): React.JSX.Element {
   const anchor = useRef<HTMLSpanElement>(null)
   const menu = useRef<HTMLDivElement | null>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   const mounted = useRef(false)
   const submitting = useRef(false)
-  const [draft, setDraft] = useState<SelectionDraft>()
+  const [draft, setDraft] = useState<SelectionDraft | undefined>(() => initialReference === undefined ? undefined : { reference: initialReference, x: 0, y: 0, bottom: 0, keyboard: false, form: true })
   const [question, setQuestion] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const dismiss = () => {
     if (submitting.current) return
     setDraft(undefined)
+    onDismiss?.()
     previousFocus.current?.focus({ preventScroll: true })
   }
 
   useEffect(() => {
     mounted.current = true
+    if (initialReference !== undefined) return () => { mounted.current = false }
     const scope = anchor.current?.closest<HTMLElement>('[data-conversation-scroll]')
     // 不猜测第三方布局；没有正文所属容器时仅保留 /btw 入口。
     if (!scope) return () => { mounted.current = false }
@@ -49,6 +55,8 @@ export function SelectionAsk({
       if (event instanceof KeyboardEvent && (event.isComposing || !(event.key === 'Shift' || (event.shiftKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))))) return
       if (draft?.form || (event instanceof MouseEvent && event.button !== 0)) return
       if (event.defaultPrevented || !(event.target instanceof Element)) return
+      // The integrated annotation toolbar owns assistant response selections.
+      if (event.target.closest('[data-dca-content]')) return
       const details = captureSelectionDetails(scope, event.target)
       if (!details) return
       const rect = document.getSelection()!.getRangeAt(0).getBoundingClientRect()
@@ -135,7 +143,7 @@ export function SelectionAsk({
     setError('')
     try {
       await store.ask(sessionId, value.trim(), draft.reference)
-      if (mounted.current) { setDraft(undefined); previousFocus.current?.focus({ preventScroll: true }) }
+      if (mounted.current) { setDraft(undefined); onDismiss?.(); previousFocus.current?.focus({ preventScroll: true }) }
     } catch (issue) {
       if (mounted.current) setError(issue instanceof Error ? issue.message : String(issue))
     } finally {

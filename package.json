@@ -1,14 +1,14 @@
 {
   "name": "@michengai/dsh-btw",
-  "version": "1.0.2",
-  "description": "DSH 一次性只读旁问插件：基于当前上下文回答，独立气泡，不执行工具 · One-shot read-only side-ask plugin: answers from current context in an independent bubble, no tool execution",
+  "version": "1.1.0",
+  "description": "原文批注与 BTW 旁问整合版：批注汇总主对话，旁问独立气泡并保留工具调用",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MichengAI/dsh-btw.git"
+    "url": "git+https://github.com/davidLi17/dsh-btw.git"
   },
-  "homepage": "https://github.com/MichengAI/dsh-btw#readme",
+  "homepage": "https://github.com/davidLi17/dsh-btw#readme",
   "bugs": {
-    "url": "https://github.com/MichengAI/dsh-btw/issues"
+    "url": "https://github.com/davidLi17/dsh-btw/issues"
   },
   "publishConfig": {
     "access": "public",
@@ -34,7 +34,8 @@
     "README.zh-CN.md",
     "CHANGELOG.md",
     "CHANGELOG.zh-CN.md",
-    "LICENSE"
+    "LICENSE",
+    "ANNOTATIONS-LICENSE"
   ],
   "dsh": {
     "bundle": {
@@ -45,7 +46,10 @@
       "inject": [
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-client-locale"
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-input-trigger"
       ]
     }
   },
@@ -54,9 +58,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:release": "node --test tests/release.test.mjs tests/npm-oidc.test.mjs tests/github-release.test.mjs",
-    "check": "npm run typecheck && npm test && npm run test:release && npm run build",
+    "check": "npm run typecheck && npm test && npm run test:annotations && npm run test:release && npm run build",
     "prepack": "npm run build",
-    "test:compat": "node scripts/test-compatibility.mjs"
+    "test:compat": "node scripts/test-compatibility.mjs",
+    "test:annotations": "node --test tests/annotations-*.test.mjs"
   },
   "engines": {
     "node": ">=22"
@@ -70,7 +75,8 @@
     "@deepseek-ai/dsh-subagent": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.1 || 0.2.1-rc.2",
     "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.1 || 0.2.1-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.1 || 0.2.0-rc.2 || 0.2.1-rc.1 || 0.2.1-rc.2",
-    "react": "^18.3.1"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5",

@@ -1,178 +1,21 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/MichengAI/dsh-btw/2d8dd7752cec1b29dd705969eaa932635ba0bf4f/assets/branding/dsh-btw-banner.png" alt="DSH BTW" width="100%">
-</p>
+# 原文批注 + BTW 旁问整合版（1.1.0）
 
-<div align="center">
+安装本 Fork 即包含两项功能：在助手回复选中文字，同一工具栏选择「添加到对话」或「BTW 旁问」。
+- 添加到对话：复用 Codex annotations 的编号锚点、可选评论、多条汇总发送和原文回跳。
+- BTW 旁问：原独立气泡、上下文继承与宿主工具调用保持不变；不会把批注自动发送到主对话。
+- 安装前请关闭独立的 dsh-codex-annotations，避免重复工具栏和重复处理。不要同时启用两份。
+- 原批注 localStorage key 和协议未改；同一客户端、同一站点、同一会话的数据可继续读取。不要清除站点存储。跨客户端不自动迁移。
+- 安装地址：github:davidLi17/dsh-btw#main
 
-# DSH BTW
+批注功能复用自 [dsh-codex-annotations](https://github.com/deepseek-harness-plugins/dsh-codex-annotations) 提交 9d405b1888ebbef1609e4b2f7ef6166f29012fcb（0.2.14）。源码位于 src/annotations，遵循 MIT，完整版权声明见 ANNOTATIONS-LICENSE；原 BTW 保持 Apache-2.0。
 
-**Ask a side question in DeepSeek Harness. Answers only, no tool execution.**
+## 使用
 
-[简体中文](README.zh-CN.md) · [Screenshots](#screenshots) · [Installation](#installation) · [Usage](#usage) · [Changelog](CHANGELOG.md) · [Apache-2.0](LICENSE)
+选区添加到对话后，可写评论并保存；可继续添加其他批注，随后用主输入框发送。编号与批注胶囊可回跳原文。旁问也可通过 /btw 输入，不中断主对话。工具是否执行仍由宿主权限控制。
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
-[![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+## 构建与验证
 
-</div>
-
-> DSH BTW is a community-maintained DeepSeek Harness plugin, not an official DeepSeek AI product. Type `/btw your question` in the current conversation to get a context-aware answer in an independent bubble without interrupting the main task. Supports DSH Web and desktop apps that include DSH Web. From `1.0.0`, hosts outside the supported list are rejected by the version gate and the plugin will not run; installed configuration and main-conversation records are kept.
-
-## Fork behavior
-
-This fork removes BTW’s **Add to conversation** selection action while keeping **Ask BTW** and `/btw`. Side questions may use tools exposed by the host fork provider, subject to the host’s existing permissions, sandbox and approval flow. Inherited conversation and quotations remain background, not authorization to continue the main task. In DSH 0.2.1-rc.2, delegated agents have a fixed permission scope: tools requiring new approval are rejected by the host, not escalated through a new approval popup. The original answer-only descriptions below describe upstream behavior, not this fork. Rebuild and commit `lib` when changing source.
-
-## Features
-
-- **Context-aware questions**: explain concepts, recap conclusions, or ask a quick question about the current conversation.
-- **Answers only**: no reading new files, browsing the web, running commands, or editing code.
-- **Independent answer bubbles**: render Markdown and formulas, copy answers, collapse, expand, and close individual bubbles. Multiple answers can stay visible.
-- **Keep the main task going**: side questions are answered separately and do not add answers to the main conversation.
-- **Cancel anytime**: close a bubble while it is answering to cancel that question.
-- **Themes and languages**: follow DSH light and dark themes and switch between Chinese and English UI.
-
-## Screenshots
-
-### Side questions in stock DSH
-
-The main conversation stays in place, with the side answer above the composer.
-
-![A BTW answer bubble in the stock DSH conversation](https://raw.githubusercontent.com/MichengAI/dsh-btw/2d8dd7752cec1b29dd705969eaa932635ba0bf4f/assets/screenshots/btw-conversation.png)
-
-### Command menu
-
-Type `/` and select `btw` under Commands, or enter `/btw your question` directly.
-
-![The official command menu with btw](https://raw.githubusercontent.com/MichengAI/dsh-btw/2d8dd7752cec1b29dd705969eaa932635ba0bf4f/assets/screenshots/btw-command-menu.png)
-
-### Independent answer bubbles
-
-Each answer has its own copy, collapse or expand, and close controls in the upper right.
-
-![Multiple answer bubbles with copy, collapse, and close controls](https://raw.githubusercontent.com/MichengAI/dsh-btw/2d8dd7752cec1b29dd705969eaa932635ba0bf4f/assets/screenshots/btw-bubbles.png)
-
-## DSH product ecosystem
-
-For a desktop workbench, download [DSH Codex Desktop](https://github.com/MichengAI/dsh-codex-desktop/releases). Existing [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) installations can add plugins as needed by following each project's README. Below are 11 first-party plugins; consult the corresponding desktop release notes and bundled catalog for what that version includes.
-
-| Plugin | What you can do |
-| --- | --- |
-| [Codex UI](https://github.com/MichengAI/dsh-codex-ui) | Organize projects and conversations, search tasks, and navigate chat turns |
-| [Agency Agents](https://github.com/MichengAI/dsh-agency-agents) | Choose and summon specialists for your task |
-| [Skills Manager](https://github.com/MichengAI/dsh-skills-manager) | Find, enable, create, and import local skills |
-| [Archive Manager](https://github.com/MichengAI/dsh-archive-manager) | Search, restore, or clean up archived conversations |
-| [IM Connect](https://github.com/MichengAI/dsh-im-connect) | Send tasks and receive replies through messaging platforms |
-| [Automation](https://github.com/MichengAI/dsh-automation) | Schedule tasks and review each run |
-| [BTW](https://github.com/MichengAI/dsh-btw) | Ask side questions without interrupting the main task |
-| [Simplify](https://github.com/MichengAI/dsh-simplify) | Use `/simplify` to improve code within your Git changes |
-| [PUA](https://github.com/MichengAI/dsh-pua) | Guide the Agent to try new approaches after failures, investigate causes, and verify results before completion |
-| [Code Review](https://github.com/MichengAI/dsh-code-review) | Use `/review` to request an independent Agent code review and receive the report in the current conversation |
-| [Codex Pet](https://github.com/MichengAI/dsh-codex-pet) | View conversation notifications and respond to tool approvals and questions through a desktop pet |
-
-## Prerequisites
-
-- An installed copy of DeepSeek Harness.
-- Plugin `1.0.0` is tested with DeepSeek Harness `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.1`, and `0.2.1-rc.2`.
-- Hosts before `0.2.0`, and `0.2.1` alphas, are no longer supported. The version gate rejects them, and the plugin will not load or run. Installed configuration and main-conversation records are kept. If you still use a `0.1.x` host, install plugin `0.1.24` instead of `@latest`.
-- Node.js 22+ and `dsh` available in your terminal.
-
-## Installation
-
-Examples use the `web` profile; replace it with your target profile. Disable other plugins that provide `/btw` before installing.
-
-### Ask an agent to install it (recommended)
-
-Send the prompt below to any agent that can run terminal commands on your computer. Replace `web` with your actual profile. Once installed, use the plugin in DSH.
-
-```text
-Install the DSH plugin @michengai/dsh-btw into my local web profile by running: dsh plugin --profile web add @michengai/dsh-btw@latest --registry=https://registry.npmjs.org/. Then run dsh --profile web --dump-config, confirm the configuration includes michengai-btw, and explain how to reload DSH and start using the plugin.
-```
-
-### Install manually from npm
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-
-dsh plugin --profile web add @michengai/dsh-btw@latest --registry=https://registry.npmjs.org/
-```
-
-### Reloading
-
-Install or update after current tasks finish, as desktop apps may reload automatically. If the change has not taken effect, use the desktop app's reload action or restart the `dsh web` service. Refreshing the browser alone is not enough.
-
-Installing `@latest` on a host before `0.2.0`, or on a `0.2.1` alpha, is rejected by the version gate, and the plugin will not run. On `0.1.x`, install `0.1.24` instead. Rejection does not delete existing configuration or main-conversation records.
-
-## Usage
-
-### Ask about selected text
-
-Select text within a single conversation message, choose **Ask BTW** from the compact selection toolbar, and enter a question or choose **Explain this**. Enter sends, Shift+Enter inserts a newline, and Esc cancels. Answers use the existing BTW bubbles with an expandable quote.
-
-- Supports prose, lists, and code text; quotes are limited to 8,000 UTF-16 code units including whitespace and are never silently truncated.
-- The quote is frozen when the menu opens. Other context comes from completed main-chat content at send time.
-- Main-composer drafts are preserved. Cross-message selections, editable fields, and tool output do not show the menu.
-- **Add to conversation** appends a quote to the existing draft without sending. After insertion, focus returns to the composer; insertion is blocked while a message is being submitted. Right-click keeps the browser's native menu.
-- Keyboard selection is supported inside focused message elements: release Shift to focus the toolbar. Browsers without the Popover API use a fixed-position fallback, which may be clipped by the host layout.
-- Coexists with `dsh-better-sidebar`: BTW handles conversation text only; file previews and editors retain the sidebar plugin's own **Add to conversation** action without a duplicate toolbar.
-- This entry uses host DOM markers. Unrecognized layouts keep their normal context menu; `/btw` remains available.
-
-### Command entry
-
-In a conversation with existing context, enter:
-
-```text
-/btw Summarize the proposed plan in one sentence.
-```
-
-| Goal | Action |
-| --- | --- |
-| Ask a side question | Submit `/btw your question`, or choose `btw` from the `/` menu. |
-| Read the answer | Wait for the answer in the independent bubble above the composer. |
-| Copy an answer | Click the copy icon in the bubble's upper right. |
-| Collapse or expand | Click the collapse or expand icon. |
-| Cancel a question | Close its bubble while it is running. The main task is unaffected. |
-| Dismiss an answer | Close the completed bubble. |
-| Ask again | Submit another `/btw` question. Each question is independent. |
-
-Use the regular conversation to run commands, edit code, or continue the main task. BTW can only answer using existing context.
-
-BTW accepts text only. Side questions with images or files are rejected without clearing the draft or attachments; remove the attachments before retrying.
-
-### Usage Notes
-
-- Each question is independent and uses completed content from the main conversation at the time you ask. It does not include an answer still being generated or previous side questions.
-- Bubbles are not restored after refreshing the page. Copy any answers you want to keep first.
-
-## Uninstallation
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-
-dsh plugin --profile web remove @michengai/dsh-btw
-```
-
-Reload DSH afterward. Disabling or updating the plugin does not delete the main conversation's records.
-
-## Development
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-
-npm ci --ignore-scripts
+npm ci
 npm run check
-```
 
-`npm run check` runs type checking, tests, and a build.
-
-Development and builds target `0.2.1-rc.2`. `npm run test:compat` builds with that baseline and runs the test suite on each of the four isolated host versions, using a test model adapter. DOM component tests do not replace live-browser acceptance.
-
-GitHub and npm both include a ready-to-run `lib`; after changing source, run `npm run build` before committing.
-
-To install from source, run `dsh plugin --profile web add . --ignore-scripts` from the project directory, then reload DSH.
-
-## License
-
-[Apache-2.0](LICENSE). Copyright 2026 MichengAI.
+GitHub 安装直接读取 lib/index.js 与 lib/client.js，修改源码后必须构建并提交产物。

@@ -1,3 +1,4 @@
+import { apply as applyAnnotations } from './annotations/index.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-commands'
@@ -11,7 +12,7 @@ import { translate } from './locales'
 import { hideInternalCommands } from './server/command-visibility'
 
 export const name = 'michengai-btw'
-export const inject = ['commands', 'subagents', 'tools']
+export const inject = ['commands', 'subagents', 'tools', 'sessions']
 
 interface SideAgent {
   ctx?: {
@@ -24,6 +25,7 @@ interface SideAgent {
 
 /** 宿主命令只负责接入与身份绑定，不创建 HTTP 或持久侧聊接口。 */
 export function apply(ctx: Context): void {
+  applyAnnotations(ctx)
   ctx.effect(() => hideInternalCommands(ctx.commands))
   const jobs = new SideJobs(async request => {
     // 0.2.1-rc.1 起只有 startActivation；0.2.0-rc.1 与 0.2.0-rc.2 仍只有 start。

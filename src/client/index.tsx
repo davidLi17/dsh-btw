@@ -1,3 +1,4 @@
+import { apply as applyAnnotations } from '../annotations/client.jsx'
 import React from 'react'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { Context } from '@deepseek-ai/cordis'
@@ -18,7 +19,7 @@ import { SelectionAsk } from './SelectionAsk'
 import { CSS } from './styles'
 import { en, zh, NS, normalizeLocale, type BtwTranslate } from '../locales'
 
-export const inject = ['slots', 'remote', 'remote.commands', 'locale', 'conversation', 'sessions']
+export const inject = ['slots', 'remote', 'remote.commands', 'locale', 'conversation', 'sessions', 'uiConversation', 'inputTriggers']
 
 function BtwCommandIcon({ size = 16, className }: { size?: number; className?: string }): React.JSX.Element {
   return <MessageCircle size={size} className={className} />
@@ -134,6 +135,8 @@ export function apply(ctx: Context): void {
     run: (session, id, question, signal, reference) => execute(session, `/${RUN_COMMAND} ${JSON.stringify({ id, question, reference, locale: normalizeLocale(t('locale.id')) })}`, signal),
     close: (session, id) => execute(session, `/${CLOSE_COMMAND} ${id}`),
   }, t)
+
+  applyAnnotations(ctx, { store, t, isSubagent })
 
   const claim = (sessionId: SessionId): PickOutcome => ({ claim: {
     name: 'btw', token: '/btw ', get hint() { return t('command.hint') },

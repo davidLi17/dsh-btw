@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { expect, it, vi } from 'vitest'
-import { apply } from '../src/index'
+import { apply, inject } from '../src/index'
 import { CLOSE_COMMAND, RUN_COMMAND } from '../src/shared'
 
 const runtimeRoot = process.env.DSH_RUNTIME_ROOT ?? fileURLToPath(new URL('../node_modules', import.meta.url))
@@ -29,6 +29,7 @@ it.each(runtimeRoots)('真实 RPC 目录隐藏内部命令且执行与卸载正�
   const { TypertGatewayService } = await import(/* @vite-ignore */ modulePath('dsh-api-gateway'))
   const { TYPERT } = await import(/* @vite-ignore */ modulePath('dsh-commands', 'typert.host.js'))
   const ctx = new Context()
+  ctx.provide('sessions', { list: () => [] })
   new CommandRuntime(ctx)
   const registry = new TypertRegistry(ctx)
   registry.register(TYPERT)
@@ -55,7 +56,7 @@ it.each(runtimeRoots)('真实 RPC 目录隐藏内部命令且执行与卸载正�
     : new connection.OperatorPeer!(ctx)
   const listRemote = () => gateway.invoke({ namespace: 'commands', method: 'list', args: { agentId: 'main' }, peer })
   ctx.commands.register({ name: 'other', description: '其他命令', handler: () => ({ kind: 'success', text: 'other' }) })
-  const plugin = ctx.plugin(apply)
+  const plugin = ctx.plugin({ apply, inject })
   try {
     await plugin.await()
     expect(ctx.commands.list(agent).map(item => item.name)).toEqual(['btw', 'other'])

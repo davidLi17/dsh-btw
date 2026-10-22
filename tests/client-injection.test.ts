@@ -36,7 +36,7 @@ it('真实 Cordis 依赖检查下可通过官方指令目录发送旁问', async
     }
   }
   const injectedStyles: { dataset: Record<string, string>; textContent?: string; removed?: boolean }[] = []
-  vi.stubGlobal('window', { localStorage: { getItem: () => null, setItem: () => {} }, __ModuleLoader__: loader })
+  vi.stubGlobal('window', { addEventListener: () => {}, removeEventListener: () => {}, localStorage: { getItem: () => null, setItem: () => {} }, __ModuleLoader__: loader })
   vi.stubGlobal('document', {
     createElement: (tag: string) => {
       const el: { dataset: Record<string, string>; textContent: string; removed?: boolean; remove: () => void } = {
@@ -50,8 +50,10 @@ it('真实 Cordis 依赖检查下可通过官方指令目录发送旁问', async
     head: { append: () => {} },
   })
   ctx.provide('sessions', { scope: () => ctx })
+  ctx.provide('uiConversation', {})
+  ctx.provide('inputTriggers', { registerSource: () => () => {} })
   ctx.provide('conversation', { input: { for: () => ({}) } })
-  ctx.provide('slots', { inject: () => () => {} })
+  ctx.provide('slots', { entries: () => [], inject: () => () => {} })
   ctx.provide('commandUi', commandUi)
   const LocaleRuntime = hostLocaleRuntime()
   const locale = new LocaleRuntime(ctx)
@@ -104,8 +106,8 @@ it('真实 Cordis 依赖检查下可通过官方指令目录发送旁问', async
       description: '结合上下文回答，按需使用宿主工具',
       hint: '旁问内容',
     })
-    expect(injectedStyles).toHaveLength(1)
-    expect(injectedStyles[0]?.dataset).toMatchObject({
+    expect(injectedStyles).toHaveLength(2)
+    expect(injectedStyles.find(s => s.dataset.michengaiBtw === '')?.dataset).toMatchObject({
       plugin: '@michengai/dsh-btw',
       pluginCss: '@michengai/dsh-btw/client.css',
       michengaiBtw: '',
@@ -113,7 +115,7 @@ it('真实 Cordis 依赖检查下可通过官方指令目录发送旁问', async
   } finally {
     await plugin.dispose()
     await ctx.fiber.dispose()
-    expect(injectedStyles[0]?.removed).toBe(true)
+    expect(injectedStyles.every(s => s.removed)).toBe(true)
   }
 })
 
@@ -160,7 +162,7 @@ it('DSH 0.2.0-rc.2 claimStyles 不会误认领或因其他插件卸载而摘除 
     head: { append: () => {} },
     documentElement: { append: () => {} },
   })
-  vi.stubGlobal('window', { localStorage: { getItem: () => null, setItem: () => {} }, __ModuleLoader__: { load: () => {} } })
+  vi.stubGlobal('window', { addEventListener: () => {}, removeEventListener: () => {}, localStorage: { getItem: () => null, setItem: () => {} }, __ModuleLoader__: { load: () => {} } })
 
   const ctx = new Context()
   class Remote extends Service {
@@ -168,8 +170,10 @@ it('DSH 0.2.0-rc.2 claimStyles 不会误认领或因其他插件卸载而摘除 
     get commands() { return { execute: async () => ({ ok: true, value: { result: { kind: 'success' } } }) } }
   }
   ctx.provide('sessions', { scope: () => ctx })
+  ctx.provide('uiConversation', {})
+  ctx.provide('inputTriggers', { registerSource: () => () => {} })
   ctx.provide('conversation', { input: { for: () => ({}) } })
-  ctx.provide('slots', { inject: () => () => {}, register: () => () => {} })
+  ctx.provide('slots', { entries: () => [], inject: () => () => {}, register: () => () => {} })
   ctx.provide('commandUi', { candidates: async () => [], dispatch: () => ({}), matchSpace: () => ({}), matchEnter: async () => ({}), execute: async () => ({}) })
   const LocaleRuntime = hostLocaleRuntime()
   ctx.provide('locale', new LocaleRuntime(ctx))

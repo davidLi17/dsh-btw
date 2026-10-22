@@ -1,0 +1,258 @@
+import { SelectionAsk } from '../client/SelectionAsk';
+import React, { useState, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
+import { createRuntime } from './runtime.js';
+import { decodeText } from './core.js';
+import { capture, restoreRange } from './ranges.js';
+import { readingViewport, revealQuote } from './navigation.js';
+import css from './styles.css?inline';
+import { decorateSlot } from './slot-decoration.js';
+
+export const inject = ['slots', 'sessions', 'conversation', 'uiConversation', 'inputTriggers'];
+const snapshot = store => useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+const icon = (type) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{type === 'check' ? <path d="m5 12 4 4L19 6"/> : type === 'edit' ? <path d="m15 4 5 5M4 20l5-1L20 8a3.5 3.5 0 0 0-5-5L4 14l-1 7Z"/> : type === 'delete' ? <><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></> : type === 'comment' ? <><path d="M20 15a3 3 0 0 1-3 3H9l-4 3v-3a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3Z"/><path d="M7 8h8M7 12h5"/></> : <path d="m6 6 12 12M18 6 6 18"/>}</svg>;
+
+function Float({ anchor, gap = 6, inset = 0, align = 'start', children, className = '', onDismiss, viewport, reveal, avoid, hover }) {
+  const root = useRef(null); const [position, setPosition] = useState({ left: 12, top: 12 });
+  useLayoutEffect(() => {
+    const update = () => {
+      const rect = anchor(), el = root.current;
+      if (!rect || !el) { onDismiss?.(); return; }
+      const area = viewport?.() ?? { left: 12, right: window.innerWidth - 12, top: 12, bottom: window.innerHeight - 12 };
+      const desiredLeft = rect.left + (align === 'center' ? (rect.width - el.getBoundingClientRect().width) / 2 : inset);
+      const left = Math.max(area.left, Math.min(desiredLeft, area.right - el.offsetWidth));
+      let top = rect.top - el.offsetHeight - gap;
+      const excluded = avoid?.();
+      if (excluded && excluded.right > left && excluded.left < left + el.offsetWidth
+        && excluded.bottom > top && excluded.top < top + el.offsetHeight) top = excluded.top - el.offsetHeight - gap;
+      if (top < area.top) top = rect.bottom + gap;
+      setPosition({ left, top: Math.max(area.top, Math.min(top, area.bottom - el.offsetHeight)) });
+    };
+    const resized = () => { reveal?.(root.current.offsetHeight + gap + (avoid?.()?.height ?? 0) + 2); update(); };
+    resized(); const observer = new ResizeObserver(resized); observer.observe(root.current);
+    window.addEventListener('resize', update); document.addEventListener('scroll', update, true);
+    const outside = e => { if (!root.current?.contains(e.target) && !e.target.closest('[data-dca-marker],[data-dca-anchor]')) onDismiss?.(); };
+    const escape = e => { if (e.key === 'Escape') { e.stopPropagation(); onDismiss?.(); } };
+    document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape);
+    return () => { observer.disconnect(); window.removeEventListener('resize', update); document.removeEventListener('scroll', update, true); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+  }, [anchor, gap, inset, align, onDismiss, viewport, reveal, avoid]);
+  return createPortal(<div ref={root} data-dca-ui="" className={`dca-float ${className}`} style={position} {...hover}>{children}</div>, document.body);
+}
+
+function useHoverCard() {
+  const [expanded, setExpanded] = useState(false), timer = useRef(null);
+  const close = () => { clearTimeout(timer.current); setExpanded(false); };
+  const hover = {
+    onPointerEnter: () => { clearTimeout(timer.current); setExpanded(true); },
+    // Allow crossing the small gap between the chip and its portal card.
+    onPointerLeave: () => { clearTimeout(timer.current); timer.current = setTimeout(close, 140); }
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return { expanded, open: hover.onPointerEnter, close, hover };
+}
+
+function Editor({ note, face, anchor, close, initiallyExpanded = true, viewport, reveal, avoid }) {
+  const input = useRef(null);
+  const [expanded, setExpanded] = useState(initiallyExpanded), [draft, setDraft] = useState(note.comment);
+  useEffect(() => { input.current?.focus({ preventScroll: true }); }, []);
+  useLayoutEffect(() => { if (input.current) { input.current.style.height = 'auto'; input.current.style.height = `${Math.max(22, input.current.scrollHeight)}px`; } }, [draft, expanded]);
+  const save = () => { if (draft === note.comment || face.edit(note.id, { comment: draft }) !== false) close(); };
+  return <Float anchor={anchor} gap={7} inset={90} className={`dca-editor ${expanded ? 'dca-editor-expanded' : 'dca-editor-compact'}`} onDismiss={close} viewport={viewport} reveal={reveal} avoid={avoid}>
+    <textarea ref={input} aria-label={`批注 ${note.number} 的可选评论`} placeholder="添加可选评论…" rows={1} value={draft}
+        onPointerDown={() => setExpanded(true)} onChange={e => { setExpanded(true); setDraft(e.target.value); }}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); e.stopPropagation(); save(); } }} />
+    {expanded && <div className="dca-editor-actions">
+        <button className="dca-icon dca-delete" aria-label={`删除批注 ${note.number}`} onClick={() => { if (face.remove(note.id) !== false) close(); }}>{icon('delete')}</button>
+        <span className="dca-editor-spacer"/>
+        <button className="dca-cancel" onClick={close}>取消</button>
+        <button className="dca-save" onClick={save}>保存</button>
+      </div>}
+  </Float>;
+}
+
+function AnnotationList({ notes, face, anchor, close, edit, editable = true, hover }) {
+  return <Float anchor={anchor} gap={4} className="dca-annotations" onDismiss={close} hover={hover}>
+    {notes.map(note => <div className={`dca-annotation ${note.selected === false && note.status !== 'sent' ? 'dca-muted' : ''}`} key={note.id}>
+      {editable ? <label className="dca-item-number"><input type="checkbox" aria-label={`发送批注 ${note.number}`} checked={note.selected} onChange={e => face.edit(note.id, { selected: e.target.checked })}/><span>{note.number}.</span></label> : <span className="dca-item-number">{note.number}.</span>}
+      <div className="dca-item-body"><span className="dca-item-label">所选文本：</span>
+        <button className="dca-quote" onClick={() => { close(); face.locate(note); }}>{note.quote}</button>
+        <span className="dca-item-label dca-comment-label">用户评论：</span><p className="dca-comment">{note.comment || '未添加评论'}</p>
+      </div>
+      {editable && <div className="dca-item-actions"><button className="dca-icon" aria-label={`编辑批注 ${note.number}`} onClick={e => edit(note, e)}>{icon('edit')}</button><button className="dca-icon" aria-label={`删除批注 ${note.number}`} onClick={() => face.remove(note.id)}>{icon('delete')}</button></div>}
+    </div>)}
+  </Float>;
+}
+
+function Assistant({ inner: Inner, dca: face, btw, ...props }) {
+  const root = useRef(null), source = useRef(null);
+  const view = snapshot(face.store);
+  const [selection, setSelection] = useState(null), [open, setOpen] = useState(null), [layout, setLayout] = useState([]);
+  const [btwReference, setBtwReference] = useState(null);
+  const nodeKey = String(props.node.key);
+  const notes = view.annotations.filter(a => a.nodeKey === nodeKey && a.status === 'pending');
+  const selected = () => {
+    if (!source.current) return;
+    const current = window.getSelection(); if (!current?.rangeCount || current.isCollapsed) return;
+    const range = current.getRangeAt(0).cloneRange();
+    const selector = capture(source.current, range, nodeKey);
+    if (selector) { setSelection({ selector, range }); setOpen(null); }
+  };
+  useLayoutEffect(() => {
+    let frame;
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!root.current || !source.current) return;
+        const bounds = root.current.getBoundingClientRect(); const used = [];
+        setLayout(notes.flatMap(note => {
+          const range = restoreRange(source.current, note); if (!range) return [];
+          const rects = [...range.getClientRects()].filter(r => r.width > 0 && r.height > 0)
+            .map(r => ({ left: r.left - bounds.left, top: r.top - bounds.top, width: r.width, height: r.height }));
+          if (!rects.length) return [];
+          // Links/code yield overlapping element and text rectangles. One
+          // nonzero SVG path fills their union once, including unequal boxes.
+          const paint = { left: Math.min(...rects.map(r => r.left)), top: Math.min(...rects.map(r => r.top)) };
+          paint.width = Math.max(...rects.map(r => r.left + r.width)) - paint.left;
+          paint.height = Math.max(...rects.map(r => r.top + r.height)) - paint.top;
+          const path = rects.map(r => `M${r.left - paint.left},${r.top - paint.top}h${r.width}v${r.height}h${-r.width}Z`).join('');
+          const firstTop = Math.min(...rects.map(r => r.top));
+          const firstRight = Math.max(...rects.filter(r => Math.abs(r.top - firstTop) < 2).map(r => r.left + r.width));
+          let left = Math.max(0, Math.min(firstRight - 27, bounds.width - 27)), top = firstTop - 29;
+          const initialLeft = left;
+          while (used.some(p => Math.abs(p.top - top) < 27 && Math.abs(p.left - left) < 29)) {
+            left -= 31;
+            if (left < 0) { left = initialLeft; top -= 31; }
+          }
+          used.push({ left, top });
+          return [{ note, paint, path, left, top }];
+        }));
+      });
+    };
+    measure(); const ro = new ResizeObserver(measure); ro.observe(root.current);
+    const mo = new MutationObserver(measure); mo.observe(source.current, { childList: true, subtree: true, characterData: true });
+    window.addEventListener('resize', measure); document.addEventListener('scroll', measure, true);
+    return () => { cancelAnimationFrame(frame); ro.disconnect(); mo.disconnect(); window.removeEventListener('resize', measure); document.removeEventListener('scroll', measure, true); };
+  }, [view, props.node]);
+  useEffect(() => {
+    let timer;
+    const locate = event => {
+      if (event.detail.sessionId !== face.sessionId || event.detail.note.nodeKey !== nodeKey) return;
+      const note = event.detail.note, range = restoreRange(source.current, note);
+      if (!range) { face.report('原文已变化，无法准确定位；批注原文仍保留。'); return; }
+      const editing = event.type === 'dca:edit' && note.status !== 'sent';
+      setSelection(null); setOpen(editing ? { note, reveal: true } : null);
+      const current = window.getSelection();
+      current?.removeAllRanges();
+      revealQuote(root.current, range, { spaceAbove: editing ? 100 : 36,
+        behavior: editing || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+      // Sent notes live in the message chip. A normal selection shows the
+      // requested source only until the user clicks elsewhere or selects again.
+      if (note.status === 'sent') { current?.addRange(range); return; }
+      root.current.classList.add('dca-flash');
+      clearTimeout(timer); timer = setTimeout(() => root.current?.classList.remove('dca-flash'), 1200);
+    };
+    window.addEventListener('dca:locate', locate); window.addEventListener('dca:edit', locate);
+    return () => { clearTimeout(timer); window.removeEventListener('dca:locate', locate); window.removeEventListener('dca:edit', locate); };
+  }, [face, nodeKey]);
+  const active = open && view.annotations.find(a => a.id === open.note.id);
+  const anchor = () => active ? (restoreRange(source.current, active)?.getBoundingClientRect() ?? root.current.getBoundingClientRect()) : selection?.range?.getBoundingClientRect();
+  const close = () => { setOpen(null); setSelection(null); };
+  return <div ref={root} className="dca-source" data-dca-node-key={nodeKey} data-dca-session={face.sessionId}>
+    <div ref={source} data-dca-content="" onPointerUp={() => setTimeout(selected, 0)} onKeyUp={selected}><Inner {...props}/></div>
+    <div className="dca-layer" data-dca-ui="">
+      {layout.map(({ note, paint, path, left, top }) => <React.Fragment key={note.id}>
+        <svg data-dca-highlight={note.id} className="dca-highlight" style={paint} viewBox={`0 0 ${paint.width} ${paint.height}`} aria-hidden="true"><path d={path} fillRule="nonzero"/></svg>
+        <button className="dca-marker" data-dca-marker={note.id} style={{ left, top }} aria-label={`批注 ${note.number}，待发送`}
+          onClick={() => { setSelection(null); setOpen({ note }); }}>{note.number}</button>
+      </React.Fragment>)}
+    </div>
+    {selection && !open && <Float anchor={anchor} align="center" className="dca-menu" onDismiss={close}>
+      <button onClick={() => { const note = face.add(selection.selector); if (note) { setOpen({ note, compact: true }); window.getSelection()?.removeAllRanges(); } }}>添加到对话</button>
+      {!btw.isSubagent(face.sessionId) && <button onClick={() => { setBtwReference(selection.selector.quote); close(); }}>BTW 旁问</button>}
+    </Float>}
+    {btwReference !== null && <SelectionAsk store={btw.store} sessionId={face.sessionId} t={btw.t} initialReference={btwReference} onDismiss={() => setBtwReference(null)} />}
+    {open && active && <Editor key={active.id} note={active} face={face} anchor={anchor} close={close} initiallyExpanded={!open.compact}
+      avoid={() => root.current.querySelector(`[data-dca-marker="${CSS.escape(active.id)}"]`)?.getBoundingClientRect()}
+      viewport={() => readingViewport(root.current)} reveal={open.reveal ? height => revealQuote(root.current, restoreRange(source.current, active), { spaceAbove: height, center: false }) : undefined}/>}
+  </div>;
+}
+
+function Dock({ dca: face }) {
+  const view = snapshot(face.store), notice = snapshot(face.notice);
+  const popup = useHoverCard(), [editing, setEditing] = useState(null);
+  const trigger = useRef(null);
+  const pending = view.annotations.filter(a => a.status === 'pending');
+  useEffect(() => { const open = e => { if (e.detail === face.sessionId) popup.open(); }; window.addEventListener('dca:open-list', open); return () => window.removeEventListener('dca:open-list', open); }, [face]);
+  if (!pending.length && !notice) return null;
+  const edit = (note, event) => {
+    popup.close();
+    const mounted = [...document.querySelectorAll('[data-dca-node-key]')].some(el => el.dataset.dcaSession === face.sessionId && el.dataset.dcaNodeKey === note.nodeKey);
+    if (mounted) window.dispatchEvent(new CustomEvent('dca:edit', { detail: { sessionId: face.sessionId, note } }));
+    else setEditing({ id: note.id, element: trigger.current });
+  };
+  const edited = view.annotations.find(a => a.id === editing?.id);
+  const count = pending.filter(a => a.selected).length;
+  return <div className="dca-dock" data-dca-ui="" data-dca-dock="">
+    {notice && <div role="alert" className="dca-notice"><span>{notice}</span><button aria-label="关闭提示" onClick={face.dismiss}>×</button></div>}
+    {!!pending.length && <div className="dca-batch-chip" data-dca-anchor="" {...popup.hover}>
+      <button ref={trigger} className="dca-batch-open" aria-label={count + ' 条注释'} aria-expanded={popup.expanded} onFocus={popup.open}
+        onClick={() => { popup.close(); face.locate(pending.find(a => a.selected) ?? pending[0]); }}>{icon('comment')}<span>{count} 条注释</span></button>
+      <button className="dca-chip-remove" aria-label="删除全部待发送批注" onClick={() => { if (face.clear() !== false) popup.close(); }}>{icon('close')}</button>
+    </div>}
+    {popup.expanded && !!pending.length && <AnnotationList notes={pending} face={face} anchor={() => trigger.current?.closest('.dca-batch-chip').getBoundingClientRect()} close={popup.close} hover={popup.hover} edit={edit}/>}
+    {edited && <Editor key={edited.id} note={edited} face={face} anchor={() => editing.element.getBoundingClientRect()} close={() => setEditing(null)}/>}
+  </div>;
+}
+
+function Attachments({ inner: Inner, dca: face, ...props }) {
+  return <><Inner {...props}/>{face && <Dock dca={face}/>}</>;
+}
+
+function User({ inner: Inner, dca: face, ...props }) {
+  const popup = useHoverCard(), trigger = useRef(null);
+  const payloads = [];
+  const content = (props.node.data.content ?? []).map(block => {
+    if (block.type !== 'text') return block;
+    const decoded = decodeText(block.text); payloads.push(...decoded.payloads);
+    return decoded.payloads.length ? { ...block, text: decoded.text } : block;
+  });
+  if (!payloads.length) return <Inner {...props}/>;
+  const notes = payloads.flatMap(p => p.annotations).map(note => ({ ...note, status: 'sent' }));
+  const annotationOnly = !content.some(block => block.type !== 'text' || block.text.trim()) && !props.node.data.referenceLabels?.length;
+  return <div className={`dca-user-message${annotationOnly ? ' dca-user-message-annotations-only' : ''}`}>
+    <div className="dca-sent-pills" data-dca-ui=""><div className="dca-batch-chip" data-dca-anchor="" {...popup.hover}><button ref={trigger} className="dca-batch-open" aria-label={`${notes.length} 条已发送注释`} aria-expanded={popup.expanded} onFocus={popup.open}
+      onClick={() => { popup.close(); face.locate(notes[0]); }}>{icon('comment')}<span>{notes.length} 条注释</span></button></div></div>
+    <Inner {...props} node={{ ...props.node, data: { ...props.node.data, content } }}/>
+    {popup.expanded && <AnnotationList notes={notes} face={face} editable={false} anchor={() => trigger.current.closest('.dca-batch-chip').getBoundingClientRect()} close={popup.close} hover={popup.hover}/>}
+  </div>;
+}
+
+export function apply(ctx, btw) {
+  const runtime = createRuntime(ctx);
+  const style = document.createElement('style'); style.dataset.plugin = '@michengai/dsh-btw'; style.dataset.pluginCss = '@michengai/dsh-btw/annotations.css'; style.textContent = css;
+  document.head.append(style);
+  ctx.effect(() => () => { runtime.dispose(); style.remove(); });
+  ctx.effect(() => ctx.inputTriggers.registerSource(runtime.source));
+  const registrations = new Map();
+  const names = ['conversation.chat.node', 'conversation.input.attachments'];
+  const decorate = () => {
+    const entries = names.flatMap(name => ctx.slots.entries(name));
+    for (const [entry, release] of registrations) if (!entries.includes(entry)) { registrations.delete(entry); release(); }
+    for (const name of names) for (const entry of ctx.slots.entries(name)) {
+      const Wrapper = name === 'conversation.input.attachments' ? Attachments : entry.options.key === 'assistant-step' ? Assistant : ['user', 'steering'].includes(entry.options.key) ? User : null;
+      if (!Wrapper || (entry.options.priority ?? 0) !== 0 || registrations.has(entry)) continue;
+      registrations.set(entry, () => {});
+      const release = decorateSlot(ctx, name, entry, (original, props, active) => {
+        // DSH presents reasoning and response separately with the same node key.
+        // Only the response owns quote navigation; the folded reasoning seat
+        // otherwise reports a false missing-quote warning alongside the editor.
+        if (!active || Wrapper === Assistant && props.groupPart === 'reasoning') return React.createElement(original, props);
+        return <Wrapper {...props} dca={props.sessionId === undefined ? null : runtime.faceFor(props.sessionId)} inner={original} {...(Wrapper === Assistant ? { btw } : {})}/>;
+      });
+      registrations.set(entry, release);
+    }
+  };
+  for (const name of names) ctx.slots.inject(name, decorate);
+  const off = ctx.on('slots/changed', name => { if (names.includes(name)) decorate(); });
+  ctx.effect(() => () => { off(); for (const release of [...registrations.values()].reverse()) release(); registrations.clear(); });
+}

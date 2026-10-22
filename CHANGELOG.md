@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.0] - 2026-10-22
+
+- Integrate Codex annotations 0.2.14 (MIT) with the existing BTW side-question toolbar. Preserve annotation storage, model projection, native reference sending, navigation and existing host tool permissions.
+- Ship both features in one plugin. Disable the standalone annotations plugin before using this fork.
+
 ## [1.0.2] - 2026-10-21
 
 - Prevent tool-call pattern pollution from inherited session context: Inject high-priority negative tool constraints into the trailing user prompt, instructing models that all tools are disabled and strictly forbidding tool calls or call tags in favor of direct text answers (#10).

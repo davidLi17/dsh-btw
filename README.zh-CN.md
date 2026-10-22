@@ -1,177 +1,21 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/MichengAI/dsh-btw/2d8dd7752cec1b29dd705969eaa932635ba0bf4f/assets/branding/dsh-btw-banner.png" alt="DSH BTW" width="100%">
-</p>
+# 原文批注 + BTW 旁问整合版（1.1.0）
 
-<div align="center">
+安装本 Fork 即包含两项功能：在助手回复选中文字，同一工具栏选择「添加到对话」或「BTW 旁问」。
+- 添加到对话：复用 Codex annotations 的编号锚点、可选评论、多条汇总发送和原文回跳。
+- BTW 旁问：原独立气泡、上下文继承与宿主工具调用保持不变；不会把批注自动发送到主对话。
+- 安装前请关闭独立的 dsh-codex-annotations，避免重复工具栏和重复处理。不要同时启用两份。
+- 原批注 localStorage key 和协议未改；同一客户端、同一站点、同一会话的数据可继续读取。不要清除站点存储。跨客户端不自动迁移。
+- 安装地址：github:davidLi17/dsh-btw#main
 
-# DSH BTW
-
-**在 DeepSeek Harness 当前会话中随手旁问，只回答，不执行**
-
-[English](README.md) · [界面预览](#界面预览) · [安装](#安装) · [使用](#使用) · [更新日志](CHANGELOG.zh-CN.md) · [Apache-2.0](LICENSE)
-
-[![许可证：Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
-[![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/deepseek-ai/deepseek-harness)
-[![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
-
-</div>
-
-> DSH BTW 是社区维护的 DeepSeek Harness 插件，并非 DeepSeek AI 官方产品。在当前会话中输入 `/btw 问题`，即可基于已有上下文获得独立气泡回答，不打断主任务。支持 DSH Web 及集成 DSH Web 的桌面应用。`1.0.0` 起，不在支持列表中的宿主会被版本门拒绝，插件不会运行；已安装配置和主会话记录仍保留。
-
-## 本分支行为
-
-本分支移除 BTW 划选菜单中的“添加到对话”，保留“旁问”和 `/btw`。旁问可使用宿主 fork provider 提供的工具，并继续遵守宿主现有权限、沙箱及审批流程。继承的历史和引用仅为背景，不授权继续主任务。DSH 0.2.1-rc.2 的子代理权限范围固定：需要新增审批的工具操作会被宿主拒绝，不会弹出新的审批窗口。下文原版“仅回答／不执行工具”的描述是上游行为，不适用于本分支。修改源码后必须重新构建并提交 `lib`。
-
-## 功能概览
-
-- **上下文旁问**：根据当前会话内容解释概念、回顾结论或回答临时问题。
-- **只回答，不执行**：不会读取新文件、联网、运行命令或修改代码。
-- **独立答案气泡**：支持 Markdown、公式、复制、折叠、展开和关闭，可同时查看多条旁问。
-- **不打断主任务**：旁问单独作答，答案不会写入主会话。
-- **随时取消**：关闭正在回答的气泡即可取消该旁问。
-- **主题与国际化**：跟随 DSH 浅色、深色主题，界面支持中文和英文切换。
-
-## 界面预览
-
-### 原生 DSH 中的旁问
-
-主会话保留在原来的位置，旁问答案位于输入框上方。
-
-![原生 DSH 会话中的 BTW 独立答案气泡](https://raw.githubusercontent.com/MichengAI/dsh-btw/2d8dd7752cec1b29dd705969eaa932635ba0bf4f/assets/screenshots/btw-conversation.png)
-
-### 命令入口
-
-输入 `/` 后，可在「指令」中选择 `btw`，也可以直接输入 `/btw 问题`。
-
-![官方指令菜单中的 btw 入口](https://raw.githubusercontent.com/MichengAI/dsh-btw/2d8dd7752cec1b29dd705969eaa932635ba0bf4f/assets/screenshots/btw-command-menu.png)
-
-### 独立答案气泡
-
-每条旁问单独展示，右上角提供复制、折叠或展开、关闭操作。
-
-![多条旁问气泡及复制、折叠和关闭操作](https://raw.githubusercontent.com/MichengAI/dsh-btw/2d8dd7752cec1b29dd705969eaa932635ba0bf4f/assets/screenshots/btw-bubbles.png)
-
-## DSH 产品生态
-
-想使用桌面工作台，可下载 [DSH Codex Desktop](https://github.com/MichengAI/dsh-codex-desktop/releases)；已有 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 环境，可按各项目 README 按需安装。以下列出 11 个自研插件；桌面端实际随附范围以对应版本的发行说明和内置清单为准。
-
-| 插件 | 你可以用它做什么 |
-| --- | --- |
-| [Codex UI](https://github.com/MichengAI/dsh-codex-ui) | 整理项目与会话、搜索任务、跳转对话轮次 |
-| [Agency Agents](https://github.com/MichengAI/dsh-agency-agents) | 按任务选择并召唤专业角色 |
-| [Skills Manager](https://github.com/MichengAI/dsh-skills-manager) | 统一查找、启停、创建和导入本机技能 |
-| [Archive Manager](https://github.com/MichengAI/dsh-archive-manager) | 搜索、恢复或清理已归档会话 |
-| [IM Connect](https://github.com/MichengAI/dsh-im-connect) | 从消息平台下任务、收回复 |
-| [Automation](https://github.com/MichengAI/dsh-automation) | 按计划执行任务，查看每次运行的结果 |
-| [BTW](https://github.com/MichengAI/dsh-btw) | 在当前上下文中临时旁问，不打断主任务 |
-| [Simplify](https://github.com/MichengAI/dsh-simplify) | 用 `/simplify` 整理 Git 改动范围内的代码 |
-| [PUA](https://github.com/MichengAI/dsh-pua) | 引导 Agent 在失败时换方法、查原因，并在完成前验证结果 |
-| [Code Review](https://github.com/MichengAI/dsh-code-review) | 用 `/review` 发起独立 Agent 代码审查，在当前会话接收报告 |
-| [Codex Pet](https://github.com/MichengAI/dsh-codex-pet) | 通过桌面宠物查看会话提醒、处理工具审批和问题回答 |
-
-## 前置条件
-
-- 已安装 DeepSeek Harness。
-- `1.0.0` 已验证兼容 DeepSeek Harness `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-rc.1`、`0.2.1-rc.2`。
-- 不再支持 `0.2.0` 之前的宿主，也不支持 `0.2.1` 的 alpha。这些宿主会被版本门拒绝，插件不会加载、不会运行。已安装配置和主会话记录仍保留。仍在使用 `0.1.x` 的，请安装插件 `0.1.24`，不要装 `@latest`。
-- Node.js 22+，可在终端执行 `dsh`。
-
-## 安装
-
-以下命令使用 `web` profile，请按实际环境替换。安装前停用其他提供 `/btw` 命令的插件。
-
-### 让 Agent 帮你安装（推荐）
-
-把下面这段话发给任意能够执行本机终端命令的 Agent。将 `web` 替换为实际使用的 profile；安装完成后，在 DSH 中使用本插件。
-
-```text
-请将 DSH 插件 @michengai/dsh-btw 安装到本机 web profile，执行：dsh plugin --profile web add @michengai/dsh-btw@latest --registry=https://registry.npmjs.org/。安装后执行 dsh --profile web --dump-config，确认配置包含 michengai-btw，并告诉我如何重新加载 DSH 和开始使用。
-```
-
-### 手动从 npm 安装
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-
-dsh plugin --profile web add @michengai/dsh-btw@latest --registry=https://registry.npmjs.org/
-```
-
-### 重新加载
-
-请在当前任务结束后安装或更新，桌面应用可能自动重载。若未生效，使用桌面应用的“重新加载”，或重启 `dsh web` 服务；仅刷新浏览器不够。
-
-`0.2.0` 之前的宿主，以及 `0.2.1` alpha，安装 `@latest` 会被版本门拒绝，插件不会运行。`0.1.x` 请改装 `0.1.24`。拒绝不会删除已有配置或主会话记录。
+批注功能复用自 [dsh-codex-annotations](https://github.com/deepseek-harness-plugins/dsh-codex-annotations) 提交 9d405b1888ebbef1609e4b2f7ef6166f29012fcb（0.2.14）。源码位于 src/annotations，遵循 MIT，完整版权声明见 ANNOTATIONS-LICENSE；原 BTW 保持 Apache-2.0。
 
 ## 使用
 
-### 划词旁问
+选区添加到对话后，可写评论并保存；可继续添加其他批注，随后用主输入框发送。编号与批注胶囊可回跳原文。旁问也可通过 /btw 输入，不中断主对话。工具是否执行仍由宿主权限控制。
 
-在会话单条正文中选中文字，在选区上方的横条选择「旁问」，输入问题后按 Enter 发送，或点击「解释一下」。Shift+Enter 换行，Esc 取消。回答仍显示在独立 BTW 气泡中，引用原文可展开查看。
+## 构建与验证
 
-- 支持普通段落、列表和代码块文字；一次引用最多 8000 个 UTF-16 代码单元（包括空白），超限会提示，不会截断。
-- 引用在划词时固定，正文继续生成不会改变它；其他背景使用发送时主会话已完成的内容。
-- 不占用或清空主输入框草稿；跨消息选区、输入框和工具输出不提供该菜单。
-- 横条还提供「添加到对话」，将引用追加到已有草稿并聚焦输入框，不自动发送；消息提交期间暂停添加。右键保留浏览器原有菜单。
-- 支持焦点位于正文元素内的键盘选区，释放 Shift 后聚焦横条。不支持 Popover API 的浏览器使用 fixed 浮层降级，可能受到宿主布局裁切。
-- 与 `dsh-better-sidebar` 分区域处理：BTW 仅处理会话正文，文件预览与编辑器保留侧边栏插件原有「添加到对话」选项，不重复弹出工具条。
-- 新入口依赖宿主正文 DOM 标记。无法识别的布局保留原有右键行为，仍可使用 `/btw`。
-
-### 命令旁问
-
-在已有上下文的会话中输入：
-
-```text
-/btw 用一句话总结刚才的方案
-```
-
-| 目标 | 操作 |
-| --- | --- |
-| 提一个旁问 | 输入 `/btw 问题` 并提交，或从 `/` 菜单选择 `btw`。 |
-| 查看答案 | 等待输入框上方的独立气泡返回回答。 |
-| 复制答案 | 点击气泡右上角的复制图标。 |
-| 收起或展开 | 点击气泡右上角的折叠或展开图标。 |
-| 取消旁问 | 在回答过程中关闭对应气泡，不取消主任务。 |
-| 移除答案 | 关闭已完成的气泡。 |
-| 继续提问 | 再次输入 `/btw 问题`；每次都是独立旁问。 |
-
-若需要执行命令、修改代码或继续主任务，请通过普通会话提交。BTW 只能依据已有上下文作答。
-
-BTW 只接受文字。输入框中附带图片或普通文件时会拒绝旁问，并保留输入和附件，请移除附件后重试。
-
-### 使用说明
-
-- 每次旁问相互独立，参考的是提问时主会话已完成的内容，不包含正在生成的回答或之前的旁问。
-- 刷新页面后气泡不会保留，需要保存的答案请先复制。
-
-## 卸载
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-
-dsh plugin --profile web remove @michengai/dsh-btw
-```
-
-重新加载 DSH 后生效。停用或升级不会删除主会话记录。
-
-## 本地开发
-
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-npm ci --ignore-scripts
+npm ci
 npm run check
-```
 
-`npm run check` 执行类型检查、测试和构建。
-
-开发与构建基线为 `0.2.1-rc.2`。`npm run test:compat` 用该基线编译，再在四个隔离宿主版本中分别运行测试集，模型使用测试适配器。DOM 组件测试不替代真实浏览器验收。
-
-GitHub 与 npm 都包含可直接运行的 `lib`；改了源码后，提交前运行 `npm run build`。
-
-从源码安装时，在项目目录执行 `dsh plugin --profile web add . --ignore-scripts`，然后重新加载 DSH。
-
-## 许可证
-
-[Apache-2.0](LICENSE) © 2026 MichengAI。
+GitHub 安装直接读取 lib/index.js 与 lib/client.js，修改源码后必须构建并提交产物。
