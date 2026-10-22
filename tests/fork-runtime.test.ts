@@ -4,7 +4,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import LlmRuntime, { createUserMessage, LlmAdapter } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId, SessionLogOffset, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import * as Fork from '@deepseek-ai/dsh-subagent-fork-in-process'
@@ -45,6 +45,34 @@ class MemoryWorkingDirectory extends Service {
   async set(_agent: unknown, path: string) { return path }
 }
 
+
+// Only storage is in-memory. Continuation uses the real prompt, coldResume,
+// AgentRegistry.resume, AgentLoop and settlement routing.
+function memorySessions(ctx: Context) {
+  const records = new Map<string, { header: SessionHeader; inheritedEventCount: ReturnType<typeof SessionLogOffset>; events: SessionEvent[] }>()
+  const handle = (id: string) => {
+    const record = records.get(id)!
+    return {
+      id, header: record.header, inheritedEventCount: record.inheritedEventCount, access: 'write',
+      read: async () => ({ events: structuredClone(record.events), eventState: 'detached' }),
+      append: async (events: readonly SessionEvent[]) => { record.events.push(...structuredClone(events)) },
+      flush: async () => {}, close: async () => {}, [Symbol.asyncDispose]: async () => {},
+    }
+  }
+  ctx.provide('sessionPersistence', {
+    create: async (header: SessionHeader, options: { inheritedEventCount: ReturnType<typeof SessionLogOffset> }) => {
+      records.set(header.id, { header, inheritedEventCount: options.inheritedEventCount, events: [] })
+      return handle(header.id)
+    },
+    open: async (id: string) => handle(id),
+    stat: async (id: string) => records.has(id) ? { header: records.get(id)!.header, revision: 'test' } : undefined,
+  })
+  ctx.provide('sessionQuery', {
+    observeSession: async (id: string) => ({ ...records.get(id)!, [Symbol.dispose]() {} }),
+  })
+  return records
+}
+
 it('真实 fork 继承已完成上下文、独立回答并可取消，主任务保持可用', async () => {
   const ctx = new Context()
   try {
@@ -53,6 +81,7 @@ it('真实 fork 继承已完成上下文、独立回答并可取消，主任务�
     await ctx.plugin(AgentLoop, { agents: [] }).await()
     await ctx.plugin(SubagentRuntime).await()
     await ctx.plugin(Fork, { providerName: 'fork' }).await()
+    const records = memorySessions(ctx)
     const adapter = new AnswerAdapter()
     ctx.llm.registerAdapter(['test'], adapter)
     const parent = await ctx.agentLoop.create(SessionId('btw-parent'), { provider: 'test', model: 'test' }, { cwd: process.cwd() })
@@ -83,10 +112,57 @@ it('真实 fork 继承已完成上下文、独立回答并可取消，主任务�
     expect((await pending)?.result.kind).toBe('error')
     await expect.poll(() => ctx.agents.list().length).toBe(1)
     expect(ctx.agents.get(parent.id)).toBe(parent)
-    await plugin.dispose()
     adapter.hang = false
     parent.followup(createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: '继续主任务' }] }))
     await parent.whenIdle()
     expect(adapter.requests).toHaveLength(4)
+
+    // Reopen the *completed and disposed* original BTW child through the browser API.
+    const childId = [...records.values()].find(row => row.header.origin === 'subagent')!.header.id
+    expect(ctx.agents.get(childId)).toBeUndefined()
+    const parentTurns = parent.session.ownEvents().filter(event => event.type === 'turn/start').length
+    await ctx.subagents.prompt({ parentSessionId: parent.id, childSessionId: childId,
+      requestId: 'side-followup' as never, mode: 'continuable', delivery: 'queue', content: [{ type: 'text', text: '继续旁问，不要唤醒主任务' }],
+    }, new AbortController().signal)
+    await ctx.subagents.waitForChildren(parent)
+    await parent.whenIdle()
+    expect(adapter.requests).toHaveLength(5) // child only, no sixth parent request
+    expect(parent.status).toBe('idle')
+    expect(parent.session.ownEvents().filter(event => event.type === 'turn/start')).toHaveLength(parentTurns)
+    expect(ctx.agents.get(childId)).toBeUndefined() // resumed activation also cleaned up
+    expect(parent.inbox.nextStep.some(message => message.source?.kind === 'subagent-settled')).toBe(true)
+    await plugin.dispose()
+  } finally { await ctx.fiber.dispose() }
+}, 15_000)
+
+it('旁问完成通知不打开主回合，用户下一条消息才消费参考；普通子任务仍唤醒', async () => {
+  const ctx = new Context()
+  try {
+    for (const service of [LlmRuntime, SessionStore, SessionProjectionRegistry, SystemPrompt, ToolRuntime, AgentRegistry]) await ctx.plugin(service).await()
+    await ctx.plugin(AgentLoop, { agents: [] }).await()
+    const adapter = new AnswerAdapter()
+    ctx.llm.registerAdapter(['test'], adapter)
+    const parent = await ctx.agentLoop.create(SessionId('delivery-parent'), { provider: 'test', model: 'test' })
+    const { installSideDelivery, markSideChild } = await import('../src/server/side-delivery')
+    const dispose = installSideDelivery(ctx)
+    markSideChild(parent, SessionId('side-child'))
+    const notice = (id: string) => createUserMessage({
+      source: { kind: 'subagent-settled', form: 'notice', summary: 'Done', senderSessionId: SessionId(id) },
+      content: [{ type: 'text', text: '只供参考的旁问结果' }],
+    })
+    parent.followup(notice('side-child'))
+    await parent.whenIdle()
+    expect(parent.status).toBe('idle')
+    expect(adapter.requests).toHaveLength(0)
+    expect(parent.session.ownEvents().filter(e => e.type === 'turn/start')).toHaveLength(0)
+    expect(parent.inbox.nextStep).toHaveLength(1)
+    parent.followup(createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: '现在继续' }] }))
+    await parent.whenIdle()
+    expect(adapter.requests).toHaveLength(1)
+    expect(JSON.stringify(adapter.requests[0]!.messages)).toContain('只供参考的旁问结果')
+    parent.followup(notice('ordinary-child'))
+    await parent.whenIdle()
+    expect(adapter.requests).toHaveLength(2)
+    dispose()
   } finally { await ctx.fiber.dispose() }
 }, 15_000)

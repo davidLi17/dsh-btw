@@ -10,6 +10,7 @@ import { CLOSE_COMMAND, MAX_QUESTION_LENGTH, parseRequest, questionWithReference
 import { DEFAULT_TIMEOUT_MS, SideJobs } from './server/jobs'
 import { translate } from './locales'
 import { hideInternalCommands } from './server/command-visibility'
+import { installSideDelivery, markSideChild } from './server/side-delivery'
 
 export const name = 'michengai-btw'
 export const inject = ['commands', 'subagents', 'tools', 'sessions']
@@ -26,6 +27,7 @@ interface SideAgent {
 /** 宿主命令只负责接入与身份绑定，不创建 HTTP 或持久侧聊接口。 */
 export function apply(ctx: Context): void {
   applyAnnotations(ctx)
+  ctx.effect(() => installSideDelivery(ctx))
   ctx.effect(() => hideInternalCommands(ctx.commands))
   const jobs = new SideJobs(async request => {
     // 0.2.1-rc.1 起只有 startActivation；0.2.0-rc.1 与 0.2.0-rc.2 仍只有 start。
@@ -56,6 +58,7 @@ export function apply(ctx: Context): void {
     }
     if (typeof subagents.startActivation === 'function') {
       const childId = SessionId(globalThis.crypto.randomUUID())
+      markSideChild(request.context as Agent, childId)
       const stopCreated = ctx.on('agent/created', ({ agent }) => {
         if (agent.id !== childId) return undefined
         const scoped = agent as SideAgent
