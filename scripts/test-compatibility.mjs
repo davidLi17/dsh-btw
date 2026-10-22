@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'))
-const supported = ['0.2.0-rc.1', '0.2.0-rc.2', '0.2.1-rc.1', '0.2.1-rc.2']
+const supported = ['0.2.1-rc.1', '0.2.1-rc.2']
 const versions = process.argv.slice(2)
 if (!versions.length) versions.push(...supported)
 if (versions.some(version => !supported.includes(version))) throw new Error('请使用指定的 DSH 候选版本')
@@ -25,7 +25,7 @@ for (const version of versions) {
   writeFileSync(log, '', 'utf8')
   console.log(`\nDSH ${version}：准备独立依赖图`)
   try {
-    const dependencies = Object.fromEntries(Object.entries(pkg.devDependencies)
+    const dependencies = Object.fromEntries(Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })
       .filter(([name]) => !name.startsWith('@deepseek-ai/dsh-'))
       .map(([name, range]) => [name, lock.packages[`node_modules/${name}`]?.version ?? range]))
     // 内部辅助包由各版依赖图决定，不在这里钉死。
@@ -61,8 +61,8 @@ for (const version of versions) {
         }
       }))
     }
-    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: 'dsh-btw-compatibility', private: true, type: 'module', dependencies }, null, 2) + '\n', 'utf8')
-    for (const name of ['src', 'lib', 'tests', 'scripts', 'tsconfig.json', 'tsconfig.build.json', 'vitest.config.ts', 'cordis.patch.yml']) cpSync(join(root, name), join(directory, name), { recursive: true })
+    writeFileSync(join(directory, 'package.json'), JSON.stringify({ ...pkg, private: true, dependencies, devDependencies: {}, peerDependencies: {} }, null, 2) + '\n', 'utf8')
+    for (const name of ['src', 'lib', 'locale', 'tests', 'scripts', 'tsconfig.json', 'tsconfig.build.json', 'vitest.config.ts', 'cordis.patch.yml']) cpSync(join(root, name), join(directory, name), { recursive: true })
     const env = { ...process.env }
     delete env.DSH_RUNTIME_ROOT
     delete env.DSH_DESKTOP_RUNTIME_ROOT

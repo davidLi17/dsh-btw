@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0] - 2026-10-22
+
+- Optional native speech in the side-question dialog: default microphone, draft-only transcription, conflict preservation, cancellation and disposal; retain the upstream capture implementation’s MIT license.
+
+- Correct the supported-host gate to DSH `0.2.1-rc.1` / `0.2.1-rc.2`: the retained v1.1.3 durable side-delivery implementation requires APIs absent from 0.2.0.
+- Disclose native model selection’s default-saving behavior; the public RPC has no session-only flag.
+
+- Rename the project to DSH-LHG-Utils and its display name to LHG Utils; update repository/install links to `davidLi17/dsh-lhg-utils`. Preserve npm `@michengai/dsh-btw`, Cordis `michengai-btw`, `/btw`, existing data formats, and original author/license notices.
+- Add main-composer-only Shift + ↑ / ↓ reasoning shortcuts using native DSH fixed shortcuts and session model directories. Follow each model's declared effort IDs/order, fall back to its default only when effort is unset, and never wrap at boundaries.
+- Serialize rapid changes per session and confirm native selection state; discard stale operations on external selection changes or disposal. Preserve drafts/focus and leave unrelated inputs, menus, and IME composition alone.
+- Add independent, default-on BTW, annotations, and reasoning-shortcut switches. Disabling annotations preserves saved data; missing shortcut services do not disable existing modules.
+- Reuse Codex subscription model capabilities without modifying authentication, speed modes, verbosity, or the subscription plugin backend.
+- Real Desktop/Web, renamed-repository installation, and upgrade acceptance remain pending. Automated tests are not a substitute for these release checks.
+
 ## [1.1.3] - 2026-10-22
 
 - 修复独立打开旁问子会话继续聊天后，完成通知错误唤醒主 Agent。持久保存新旁问身份，匹配的完成通知仅静默加入参考上下文；不改变普通子任务、用户消息、工具权限与清理。

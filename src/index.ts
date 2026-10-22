@@ -1,3 +1,6 @@
+import { Config } from './config'
+import { moduleLifecycle, moduleSettings } from './module-settings'
+export { Config } from './config'
 import { apply as applyAnnotations } from './annotations/index.js'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -25,8 +28,16 @@ interface SideAgent {
 }
 
 /** 宿主命令只负责接入与身份绑定，不创建 HTTP 或持久侧聊接口。 */
-export function apply(ctx: Context): void {
-  applyAnnotations(ctx)
+export async function apply(ctx: Context, config: unknown = Config({})): Promise<void> {
+  const modules = moduleLifecycle(ctx, { btw: applyBtw, annotations: applyAnnotations })
+  await modules.update(moduleSettings(config))
+  // Loader emits this on this fiber only after committing the live references.
+  ctx.on('loader/volatile-update', () => {
+    void modules.update(moduleSettings(config))
+  })
+}
+
+function applyBtw(ctx: Context): void {
   ctx.effect(() => installSideDelivery(ctx))
   ctx.effect(() => hideInternalCommands(ctx.commands))
   const jobs = new SideJobs(async request => {
