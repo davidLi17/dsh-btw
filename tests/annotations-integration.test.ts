@@ -38,7 +38,13 @@ it.each(['button', 'enter'])('批注通过 %s 保存后聚焦主输入框，保�
   const run = vi.fn(async () => ({ kind: 'success' as const, text: '旁问回答' }))
   const store = new BubbleStore({ run, close: async () => ({ kind: 'success', text: '' }) })
   const t = translate()
-  apply(ctx, { store, t, isSubagent: () => false })
+  let btwEnabled = true
+  const btwListeners = new Set<() => void>()
+  const setBtwEnabled = async (value: boolean) => {
+    await act(async () => { btwEnabled = value; for (const listener of btwListeners) listener() })
+  }
+  apply(ctx, { store, t, isSubagent: () => false, getSnapshot: () => btwEnabled,
+    subscribe: (listener: () => void) => { btwListeners.add(listener); return () => btwListeners.delete(listener) } })
   const scope = document.createElement('div'); scope.dataset.conversationScroll = ''; document.body.append(scope)
   const root = createRoot(scope)
   try {
@@ -89,6 +95,15 @@ it.each(['button', 'enter'])('批注通过 %s 保存后聚焦主输入框，保�
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
     await act(async () => window.dispatchEvent(new CustomEvent('dca:locate', { detail: { sessionId: 's1', note: { ...note, status: 'sent' } } })))
     expect(window.getSelection()!.toString()).toBe(note.quote)
+    await select()
+    await act(async () => (document.querySelectorAll('.dca-menu button')[1] as HTMLButtonElement).click())
+    window.getSelection()!.removeAllRanges()
+    expect(document.querySelector('.btw-reference blockquote')!.textContent).toBe(note.quote)
+    await setBtwEnabled(false)
+    expect(document.querySelector('.btw-selection-modal')).toBeNull()
+    await setBtwEnabled(true)
+    expect(document.querySelector('.btw-selection-modal')).toBeNull()
+    expect(run).not.toHaveBeenCalled()
     await select()
     await act(async () => (document.querySelectorAll('.dca-menu button')[1] as HTMLButtonElement).click())
     window.getSelection()!.removeAllRanges()

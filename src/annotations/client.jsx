@@ -94,6 +94,7 @@ function Assistant({ inner: Inner, dca: face, btw, ...props }) {
   const view = snapshot(face.store);
   const [selection, setSelection] = useState(null), [open, setOpen] = useState(null), [layout, setLayout] = useState([]);
   const [btwReference, setBtwReference] = useState(null);
+  useEffect(() => { if (!btwEnabled) setBtwReference(null); }, [btwEnabled]);
   const nodeKey = String(props.node.key);
   const notes = view.annotations.filter(a => a.nodeKey === nodeKey && a.status === 'pending');
   const selected = () => {
