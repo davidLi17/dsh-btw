@@ -1,6 +1,6 @@
 {
   "name": "@michengai/dsh-btw",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "支持原生 Codex 原文批注，并可通过独立气泡进行旁问。由 davidLi17 整合修改。",
   "repository": {
     "type": "git",

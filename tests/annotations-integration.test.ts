@@ -8,7 +8,7 @@ import { SelectionAsk } from '../src/client/SelectionAsk'
 import { BubbleStore } from '../src/client/bubbles'
 import { translate } from '../src/locales'
 
-it('同一选区工具栏复用批注发送、回跳及 BTW 文本快照，无第二套菜单', async () => {
+it.each(['button', 'enter'])('批注通过 %s 保存后聚焦主输入框，保留草稿、引用和旁问功能', async method => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   Range.prototype.getBoundingClientRect = () => ({ left: 100, top: 150, bottom: 170, right: 250, width: 150, height: 20 } as DOMRect)
@@ -20,7 +20,9 @@ it('同一选区工具栏复用批注发送、回跳及 BTW 文本快照，无�
   localStorage.clear()
   const cleanups: (() => void)[] = []
   const effect = (fn: () => (() => void)) => { const off = fn(); cleanups.push(off); return off }
-  const state = { phase: 'idle', draft: '', draftRev: 0, occurrences: [] as any[] }
+  const state = { phase: 'idle', draft: '已有主对话草稿', draftRev: 0, occurrences: [] as any[] }
+  const composer = document.createElement('textarea'); document.body.append(composer)
+  const focus = vi.fn(() => composer.focus())
   const subscribe = () => () => {}
   let source: any
   const binding = { ctx: { effect, bail: (_ctx: unknown, event: string, value: any) => {
@@ -29,7 +31,7 @@ it('同一选区工具栏复用批注发送、回跳及 BTW 文本快照，无�
   } }, session: { projections: { faceOf: () => ({ getSnapshot: () => ({}), subscribe }) } } }
   const entry = { options: { key: 'assistant-step', priority: 0 }, component: () => React.createElement('p', null, '用于批注与旁问的原文') }
   const ctx = { effect, on: () => () => {}, sessions: { binding: () => binding },
-    conversation: { input: { for: () => ({ state: { getSnapshot: () => state, subscribe } }) } },
+    conversation: { input: { for: () => ({ state: { getSnapshot: () => state, subscribe }, focus }) } },
     uiConversation: { binding: () => ({ target: () => ({ getSnapshot: () => ({ nodes: new Map() }), subscribe }) }) },
     inputTriggers: { registerSource: (value: any) => { source = value; return () => {} } },
     slots: { entries: (name: string) => name === 'conversation.chat.node' ? [entry] : [], inject: (_name: string, fn: () => void) => fn(), register: () => () => {} } }
@@ -58,10 +60,32 @@ it('同一选区工具栏复用批注发送、回跳及 BTW 文本快照，无�
     expect(document.querySelectorAll('.btw-selection-menu')).toHaveLength(0)
     expect(document.querySelector('.dca-menu')!.textContent).toBe('添加到对话旁问')
     await act(async () => (document.querySelector('.dca-menu button') as HTMLButtonElement).click())
-    expect(document.querySelector('.dca-editor textarea')).not.toBeNull()
+    const editor = document.querySelector('.dca-editor textarea') as HTMLTextAreaElement
+    expect(editor).not.toBeNull()
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(editor, '我的评论')
+      editor.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const occurrence = { ...state.occurrences[0] }
+    if (method === 'enter') {
+      await act(async () => editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true })))
+      expect(focus).not.toHaveBeenCalled()
+      expect(document.querySelector('.dca-editor')).not.toBeNull()
+    }
+    await act(async () => {
+      if (method === 'button') (document.querySelector('.dca-save') as HTMLButtonElement).click()
+      else editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    })
+    expect(focus).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).toBe(composer)
+    expect(document.querySelector('.dca-editor')).toBeNull()
+    expect(state.draft).toBe('已有主对话草稿')
+    expect(state.occurrences).toEqual([occurrence])
+    expect(run).not.toHaveBeenCalled()
     const encoded = await source.codec.serialize(state.occurrences[0].ref, new AbortController().signal)
     const note = decodeText(encoded).payloads[0].annotations[0]
     expect(note.quote).toBe('用于批注与旁问的原文')
+    expect(note.comment).toBe('我的评论')
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
     await act(async () => window.dispatchEvent(new CustomEvent('dca:locate', { detail: { sessionId: 's1', note: { ...note, status: 'sent' } } })))
     expect(window.getSelection()!.toString()).toBe(note.quote)
@@ -74,7 +98,7 @@ it('同一选区工具栏复用批注发送、回跳及 BTW 文本快照，无�
     expect(run).toHaveBeenCalledWith('s1', expect.any(String), t('selection.explain'), expect.any(AbortSignal), note.quote)
     expect(document.querySelector('.btw-selection-modal')).toBeNull()
   } finally {
-    await act(async () => root.unmount()); scope.remove()
+    await act(async () => root.unmount()); scope.remove(); composer.remove()
     cleanups.reverse().forEach(fn => fn()); await store.dispose(); vi.unstubAllGlobals()
   }
 })
