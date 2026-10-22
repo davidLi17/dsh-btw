@@ -1,3 +1,5 @@
+import { apply as applyEffortShortcuts } from './effort-shortcuts'
+import { moduleLifecycle, moduleSettings, SETTINGS_NAMESPACE } from '../module-settings'
 import { apply as applyAnnotations } from '../annotations/client.jsx'
 import React from 'react'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -16,6 +18,7 @@ import { CLOSE_COMMAND, RUN_COMMAND, type SideResult } from '../shared'
 import { BubbleStore, SideRequestNotStartedError } from './bubbles'
 import { BubbleDock } from './BubbleView'
 import { SelectionAsk } from './SelectionAsk'
+import { createVoiceBridge, mountVoiceBridge, type VoiceBridge } from './voice/service'
 import { CSS } from './styles'
 import { en, zh, NS, normalizeLocale, type BtwTranslate } from '../locales'
 
@@ -108,8 +111,48 @@ function attachOfficialBtw(commandUi: unknown, claim: (sessionId: string) => Pic
   return () => restore.forEach(dispose => dispose())
 }
 
-export function apply(ctx: Context): void {
+type BtwBridge = {
+  store?: BubbleStore
+  voice?: VoiceBridge
+  t: BtwTranslate
+  isSubagent: (id: string) => boolean
+  subscribe: (listener: () => void) => () => void
+  getSnapshot: () => boolean
+  notify: () => void
+}
+
+export async function apply(ctx: Context, config: unknown = {}): Promise<void> {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }))
+  const sessions = ctx.get('sessions') as unknown as ISessions
+  const listeners = new Set<() => void>()
+  const bridge: BtwBridge = {
+    t: ctx.locale.bind(NS),
+    isSubagent: id => Boolean(sessions.subagentAddress?.(id as SessionId)) || sessions.list?.getSnapshot().byId[id as SessionId]?.origin === 'subagent',
+    subscribe: listener => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    getSnapshot: () => Boolean(bridge.store),
+    notify: () => { for (const listener of listeners) listener() },
+  }
+  const modules = moduleLifecycle(ctx, {
+    btw: scope => applyBtwClient(scope, bridge),
+    annotations: scope => applyAnnotations(scope, bridge),
+    reasoningShortcuts: applyEffortShortcuts,
+  })
+  await modules.update(moduleSettings(config))
+  // Browser plugin configuration is not copied from the Host by the module loader.
+  // Follow the native settings form instead, without requiring it on older hosts.
+  ctx.inject(['configForms'], scope => {
+    const forms = scope.get('configForms') as { get(id: string): { getSnapshot(): { value?: unknown }; subscribe(listener: () => void): () => void } }
+    const form = forms.get(SETTINGS_NAMESPACE)
+    const refresh = () => {
+      const value = form.getSnapshot().value
+      if (value !== undefined) void modules.update(moduleSettings(value))
+    }
+    scope.effect(() => form.subscribe(refresh))
+    refresh()
+  })
+}
+
+function applyBtwClient(ctx: Context, bridge: BtwBridge): void {
   const t = ctx.locale.bind(NS)
   const slots = ctx.get('slots') as SlotRegistry
   const remote = ctx.get('remote') as TypertClientRemote
@@ -136,7 +179,14 @@ export function apply(ctx: Context): void {
     close: (session, id) => execute(session, `/${CLOSE_COMMAND} ${id}`),
   }, t)
 
-  applyAnnotations(ctx, { store, t, isSubagent })
+  const voice = createVoiceBridge()
+  mountVoiceBridge(ctx, voice)
+  bridge.voice = voice
+  bridge.store = store
+  bridge.notify()
+  ctx.effect(() => () => {
+    if (bridge.store === store) { bridge.store = undefined; bridge.voice = undefined; bridge.notify() }
+  })
 
   const claim = (sessionId: SessionId): PickOutcome => ({ claim: {
     name: 'btw', token: '/btw ', get hint() { return t('command.hint') },
@@ -164,7 +214,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => () => store.dispose())
 
   function Dock(props: PropsRuntime<'conversation.input.dock'> & { t: BtwTranslate }): React.JSX.Element {
-    return <>{!props.session.subagent && !isSubagent(props.session.sessionId) && <SelectionAsk key={props.session.sessionId} store={store} sessionId={props.session.sessionId} t={props.t} />}<BubbleDock store={store} sessionId={props.session.sessionId} t={props.t} /></>
+    return <>{!props.session.subagent && !isSubagent(props.session.sessionId) && <SelectionAsk key={props.session.sessionId} store={store} sessionId={props.session.sessionId} t={props.t} voice={voice} />}<BubbleDock store={store} sessionId={props.session.sessionId} t={props.t} /></>
   }
   slots.inject('conversation.input.dock', () => slots.register({ name: 'conversation.input.dock', id: 'michengai-btw', order: -50, locale: NS }, Dock))
   slots.inject('conversation.chat.commandview', () => {

@@ -4,6 +4,8 @@ import type { BubbleStore } from './bubbles'
 import type { BtwTranslate } from '../locales'
 import { MAX_QUESTION_LENGTH, MAX_REFERENCE_LENGTH } from '../shared'
 import { captureSelectionDetails } from './selection'
+import { VoiceButton, insertTranscript, type DraftTarget } from './voice/VoiceButton'
+import type { VoiceBridge } from './voice/service'
 
 interface SelectionDraft {
   reference: string
@@ -21,12 +23,14 @@ export function SelectionAsk({
   t,
   initialReference,
   onDismiss,
+  voice,
 }: {
   store: BubbleStore
   sessionId: string
   t: BtwTranslate
   initialReference?: string
   onDismiss?: () => void
+  voice?: VoiceBridge
 }): React.JSX.Element {
   const anchor = useRef<HTMLSpanElement>(null)
   const menu = useRef<HTMLDivElement | null>(null)
@@ -34,7 +38,33 @@ export function SelectionAsk({
   const mounted = useRef(false)
   const submitting = useRef(false)
   const [draft, setDraft] = useState<SelectionDraft | undefined>(() => initialReference === undefined ? undefined : { reference: initialReference, x: 0, y: 0, bottom: 0, keyboard: false, form: true })
-  const [question, setQuestion] = useState('')
+  const [question, setQuestionState] = useState('')
+  const textarea = useRef<HTMLTextAreaElement>(null)
+  const revision = useRef(0)
+  const text = useRef('')
+  const caret = useRef<number>()
+  const [voiceBusy, setVoiceBusy] = useState(false)
+  const setQuestion = (value: string) => { revision.current++; text.current = value; setQuestionState(value) }
+  useLayoutEffect(() => {
+    if (caret.current === undefined || !textarea.current) return
+    textarea.current.setSelectionRange(caret.current, caret.current)
+    caret.current = undefined
+  }, [question])
+  const voiceTarget: DraftTarget = {
+    capture: () => ({ text: text.current, revision: revision.current, start: textarea.current?.selectionStart ?? text.current.length, end: textarea.current?.selectionEnd ?? text.current.length }),
+    insert: (value, span) => {
+      if (!textarea.current || submitting.current || revision.current !== span.revision) return false
+      const next = insertTranscript(value, span)
+      if (!next) return false
+      const dialog = textarea.current.closest('[role="dialog"], dialog')
+      const restoreFocus = dialog?.contains(document.activeElement)
+      caret.current = next.caret
+      setQuestion(next.text)
+      textarea.current.setSelectionRange(next.caret, next.caret)
+      if (restoreFocus) textarea.current.focus({ preventScroll: true })
+      return true
+    },
+  }
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const dismiss = () => {
@@ -137,7 +167,7 @@ export function SelectionAsk({
   }, [draft])
 
   const send = async (value: string) => {
-    if (!draft || submitting.current || !value.trim() || draft.reference.length > MAX_REFERENCE_LENGTH) return
+    if (!draft || submitting.current || voiceBusy || !value.trim() || draft.reference.length > MAX_REFERENCE_LENGTH) return
     submitting.current = true
     setBusy(true)
     setError('')
@@ -180,14 +210,14 @@ export function SelectionAsk({
               </Button>
               <Button
                 variant="outline"
-                disabled={busy || draft.reference.length > MAX_REFERENCE_LENGTH}
+                disabled={busy || voiceBusy || draft.reference.length > MAX_REFERENCE_LENGTH}
                 onClick={() => { void send(t('selection.explain')) }}
               >
                 {t('selection.explain')}
               </Button>
               <Button
                 variant="primary"
-                disabled={busy || !question.trim() || draft.reference.length > MAX_REFERENCE_LENGTH}
+                disabled={busy || voiceBusy || !question.trim() || draft.reference.length > MAX_REFERENCE_LENGTH}
                 onClick={() => { void send(question) }}
               >
                 {t('selection.send')}
@@ -206,6 +236,7 @@ export function SelectionAsk({
             <label className="btw-selection-label">
               <span>{t('selection.question')}</span>
               <textarea
+                ref={textarea}
                 value={question}
                 disabled={busy}
                 maxLength={MAX_QUESTION_LENGTH}
@@ -220,6 +251,7 @@ export function SelectionAsk({
                 }}
               />
             </label>
+            {voice && <VoiceButton key={sessionId} bridge={voice} target={voiceTarget} locked={busy} onActiveChange={setVoiceBusy} t={t} />}
             <p className="btw-selection-hint">{t('selection.context')}</p>
             {draft.reference.length > MAX_REFERENCE_LENGTH && <p className="btw-error" role="alert">{t('error.reference')}</p>}
             {error && <p className="btw-error" role="alert">{error}</p>}

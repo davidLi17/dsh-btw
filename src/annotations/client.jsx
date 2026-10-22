@@ -89,6 +89,7 @@ function AnnotationList({ notes, face, anchor, close, edit, editable = true, hov
 }
 
 function Assistant({ inner: Inner, dca: face, btw, ...props }) {
+  const btwEnabled = useSyncExternalStore(btw.subscribe ?? (() => () => {}), btw.getSnapshot ?? (() => true));
   const root = useRef(null), source = useRef(null);
   const view = snapshot(face.store);
   const [selection, setSelection] = useState(null), [open, setOpen] = useState(null), [layout, setLayout] = useState([]);
@@ -173,9 +174,9 @@ function Assistant({ inner: Inner, dca: face, btw, ...props }) {
     </div>
     {selection && !open && <Float anchor={anchor} align="center" className="dca-menu" onDismiss={close}>
       <button onClick={() => { const note = face.add(selection.selector); if (note) { setOpen({ note, compact: true }); window.getSelection()?.removeAllRanges(); } }}>添加到对话</button>
-      {!btw.isSubagent(face.sessionId) && <button onClick={() => { setBtwReference(selection.selector.quote); close(); }}>{btw.t('selection.btw')}</button>}
+      {btwEnabled && !btw.isSubagent(face.sessionId) && <button onClick={() => { setBtwReference(selection.selector.quote); close(); }}>{btw.t('selection.btw')}</button>}
     </Float>}
-    {btwReference !== null && <SelectionAsk store={btw.store} sessionId={face.sessionId} t={btw.t} initialReference={btwReference} onDismiss={() => setBtwReference(null)} />}
+    {btwEnabled && btwReference !== null && <SelectionAsk voice={btw.voice} store={btw.store} sessionId={face.sessionId} t={btw.t} initialReference={btwReference} onDismiss={() => setBtwReference(null)} />}
     {open && active && <Editor key={active.id} note={active} face={face} anchor={anchor} close={close} initiallyExpanded={!open.compact}
       avoid={() => root.current.querySelector(`[data-dca-marker="${CSS.escape(active.id)}"]`)?.getBoundingClientRect()}
       viewport={() => readingViewport(root.current)} reveal={open.reveal ? height => revealQuote(root.current, restoreRange(source.current, active), { spaceAbove: height, center: false }) : undefined}/>}

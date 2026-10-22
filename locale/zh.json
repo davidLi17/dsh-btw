@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "原文批注与旁问",
-    "description": "支持原生 Codex 原文批注，并可通过独立气泡进行旁问。由 davidLi17 整合修改。"
+    "title": "LHG Utils",
+    "description": "集成 BTW 独立旁问、Codex 原文批注与原生思考强度快捷键。由 davidLi17 整合修改。"
   }
 }

@@ -70,4 +70,10 @@ export const CSS = `
 @keyframes btw-pulse{0%{background-color:var(--dsw-alias-interactive-bg-hover-accent,rgba(59,130,246,0.2))}100%{background-color:transparent}}
 @media(max-width:480px){.btw-dock{max-height:330px}.btw-header{padding:6px 8px 6px 12px;gap:6px}.btw-answer{padding:0 12px 12px;max-height:230px}.btw-status,.btw-error{padding-left:12px}.btw-actions{gap:0}.btw-actions button{width:36px;height:36px}}
 @media(prefers-reduced-motion:reduce){.btw-spinner{animation:none}.btw-actions button{transition:none}}
+
+.btw-voice { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.btw-voice button { display:inline-flex; align-items:center; gap:5px; padding:5px 8px; border:1px solid var(--border-color, #8885); border-radius:6px; background:transparent; color:inherit; cursor:pointer; }
+.btw-voice button:disabled { opacity:.5; cursor:default; }
+.btw-voice p { flex-basis:100%; margin:0; font-size:12px; }
+.btw-voice-transcript { white-space:pre-wrap; max-height:120px; overflow:auto; }
 `
