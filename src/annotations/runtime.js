@@ -1,4 +1,5 @@
-import { AnnotationStore, SOURCE, STORAGE_PREFIX, encodePayload, decodeText } from './core.js';
+import { AnnotationStore, SOURCE, STORAGE_PREFIX, encodePayload, decodeText, submissionText } from './core.js';
+import { resolveCitation } from './citations.js';
 
 /** Bind public DSH services only. No Lexical internals or send interception. */
 export function createRuntime(ctx) {
@@ -16,6 +17,21 @@ export function createRuntime(ctx) {
       store = new AnnotationStore({ getItem: () => null, setItem: () => { throw storageError; } }, String(sessionId));
     }
     const input = ctx.conversation.input.for(binding.ctx);
+    // Change only the native optimistic echo. prompt() still receives the
+    // original serialized message, and retirement retains its native request id.
+    const session = binding.session, begin = session.beginSubmission;
+    const descriptor = Object.getOwnPropertyDescriptor(session, 'beginSubmission');
+    function presentSubmission(options) {
+      const text = submissionText(options.text);
+      return begin.call(this, text === options.text ? options : { ...options, text });
+    }
+    if (typeof begin === 'function') session.beginSubmission = presentSubmission;
+    const restoreSubmission = () => {
+      if (session.beginSubmission !== presentSubmission) return;
+      if (descriptor) Object.defineProperty(session, 'beginSubmission', descriptor);
+      else delete session.beginSubmission;
+    };
+    releases.push(restoreSubmission);
     const listeners = new Set();
     let notice = '';
     const report = error => { if (error instanceof Error) console.error('[dsh-codex-annotations]', error.stack); notice = error instanceof Error ? error.message : String(error); for (const fn of listeners) fn(); };
@@ -49,7 +65,17 @@ export function createRuntime(ctx) {
     const face = { sessionId: String(sessionId), store, input, editable, run, report,
       notice: { subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn); }, getSnapshot: () => notice },
       dismiss: () => report(''),
-      add: selector => run(() => { const note = store.add(selector); ensure(true); return note; }),
+      add: selector => run(() => {
+        // History survives a cleared browser cache; its sent numbers remain reserved.
+        const numbers = [];
+        for (const node of chat.getSnapshot()?.nodes.values() ?? []) {
+          if (node.kind !== 'user' && node.kind !== 'steering') continue;
+          for (const block of node.data.content ?? []) if (block.type === 'text')
+            for (const payload of decodeText(block.text).payloads)
+              numbers.push(...payload.annotations.map(note => note.number));
+        }
+        const note = store.add(selector, numbers); ensure(true); return note;
+      }),
       edit: (id, fields) => run(() => {
         if (!editable()) throw new Error('请等待发送完成后再编辑批注。');
         store.edit(id, fields);
@@ -63,8 +89,17 @@ export function createRuntime(ctx) {
         detach();
       }),
       locate: note => {
+        const mounted = [...document.querySelectorAll('[data-dca-node-key]')].some(el =>
+          el.dataset.dcaSession === String(sessionId) && el.dataset.dcaNodeKey === note.nodeKey);
+        if (!mounted) { report('批注原文当前未显示，请展开对应的历史回复后重试。'); return; }
         window.dispatchEvent(new CustomEvent('dca:locate', { detail: { sessionId: String(sessionId), note } }));
-      }
+      },
+      reference: (number, replyKey) => resolveCitation(chat.getSnapshot()?.nodes.values() ?? [], replyKey, number),
+      cite: (number, replyKey) => {
+        const note = face.reference(number, replyKey);
+        if (!note) { report(`找不到此回复对应的批注 ${number}。`); return; }
+        face.locate(note);
+      },
     };
     faces.set(sessionId, face);
     // A persisted native draft stores clipboard text. Restore only our own exact token.
@@ -98,7 +133,7 @@ export function createRuntime(ctx) {
     const offInbox = inbox.subscribe(() => queueMicrotask(() => { if (!disposed) reconcile(); }));
     releases.push(offInput, offChat, offInbox);
     releases.push(() => { disposed = true; });
-    binding.ctx.effect(() => () => { disposed = true; offInput(); offChat(); offInbox(); faces.delete(sessionId); });
+    binding.ctx.effect(() => () => { disposed = true; offInput(); offChat(); offInbox(); restoreSubmission(); faces.delete(sessionId); });
     if (storageError) report(storageError);
     queueMicrotask(() => {
       reconcile();

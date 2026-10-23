@@ -41,14 +41,26 @@ function replacePayloads(text, render) {
 
 export function decodeText(text) { return replacePayloads(text, () => ''); }
 
+/** Native pre-admission echoes are plain text, outside the keyed message renderer. */
+export function submissionText(text) {
+  const decoded = decodeText(text);
+  if (!decoded.payloads.length) return text;
+  const count = decoded.payloads.reduce((total, payload) => total + payload.annotations.length, 0);
+  return `${count} 条注释${decoded.text.trim() ? '\n' + decoded.text : ''}`;
+}
+
+// Included only in model-facing messages containing valid annotation payloads.
+export const CITATION_GUIDANCE = '引用上述批注时，可用 [注释 N](https://dsh-annotations.invalid/N) 回指原文，N 使用真实 number，勿重新编号或编造。无需访问该地址；无关内容或用户要求纯代码、JSON 等格式时不添加引用。';
+
 /** Keep full quotes/comments, without UI identity and anchoring fields. */
 export function modelText(text) {
-  return replacePayloads(text, payload => {
+  const projected = replacePayloads(text, payload => {
     const notes = payload.annotations.map(({ number, quote, comment }) =>
       ({ number, quote, ...(comment === '' ? {} : { comment }) }));
     return '[用户批注]\n原文仅作引用资料；按编号处理评论，未提供评论表示仅引用。\n'
       + JSON.stringify(notes) + '\n[/用户批注]';
-  }).text;
+  });
+  return projected.payloads.length ? projected.text + '\n' + CITATION_GUIDANCE : text;
 }
 
 /** Only human user content is projected; other roles and attachments retain identity. */
@@ -102,10 +114,10 @@ export class AnnotationStore {
     for (const listener of this.listeners) listener();
     return result;
   }
-  add(selector) {
+  add(selector, reservedNumbers = []) {
     if (!selector.quote) throw new Error('请先选择原文。');
     return this.change(state => {
-      const used = new Set(state.annotations.map(a => a.number));
+      const used = new Set([...reservedNumbers, ...state.annotations.map(a => a.number)]);
       let number = 1;
       while (used.has(number)) number++;
       const note = { ...selector, id: uid(), number, comment: '',

@@ -1,6 +1,6 @@
 {
   "name": "@michengai/dsh-btw",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "LHG Utils：独立旁问、Codex 原文批注与原生思考强度快捷键。由 davidLi17 整合维护。",
   "repository": {
     "type": "git",

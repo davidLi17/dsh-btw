@@ -117,3 +117,59 @@ it.each(['button', 'enter'])('批注通过 %s 保存后聚焦主输入框，保�
     cleanups.reverse().forEach(fn => fn()); await store.dispose(); vi.unstubAllGlobals()
   }
 })
+
+it('回复内批注链接悬停预览、点击回跳，不导航外网或启动旁问', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.stubGlobal('matchMedia', () => ({ matches: true }))
+  Range.prototype.getBoundingClientRect = () => ({ left: 10, top: 30, bottom: 50, right: 100, width: 90, height: 20 } as DOMRect)
+  Range.prototype.getClientRects = () => [Range.prototype.getBoundingClientRect()] as unknown as DOMRectList
+  HTMLElement.prototype.scrollBy = () => {}
+  const { AnnotationStore, encodePayload } = await import('../src/annotations/core.js')
+  const data = new Map(), notes = new AnnotationStore({ getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => data.set(k, v) }, 's1')
+  const note = notes.add({ nodeKey: 'original', quote: '引用原文', start: 0, end: 4, prefix: '', suffix: '' })
+  notes.edit(note.id, { comment: '需要核对' })
+  const payload = notes.prepare(notes.getSnapshot().ref)
+  localStorage.clear()
+  const effects: (() => void)[] = [], subscribe = () => () => {}
+  const effect = (factory: () => (() => void)) => { const off = factory(); effects.push(off); return off }
+  const nodes = new Map([
+    ['original', { key: 'original', kind: 'assistant-step', anchorSeq: 1, data: {} }],
+    ['user', { key: 'user', kind: 'user', anchorSeq: 2, data: { content: [{ type: 'text', text: encodePayload(payload) }] } }],
+    ['reply', { key: 'reply', kind: 'assistant-step', anchorSeq: 3, data: {} }],
+  ])
+  const binding = { ctx: { effect }, session: { projections: { faceOf: () => ({ getSnapshot: () => ({}), subscribe }) } } }
+  const entry = { options: { key: 'assistant-step', priority: 0 }, component: ({ node }: any) => node.key === 'original'
+    ? React.createElement('p', null, '引用原文')
+    : React.createElement('a', { href: 'https://dsh-annotations.invalid/1', target: '_blank' }, '注释 1') }
+  const state = { phase: 'idle', draft: '主对话草稿', occurrences: [] }
+  const ctx = { effect, on: () => () => {}, sessions: { binding: () => binding },
+    conversation: { input: { for: () => ({ state: { getSnapshot: () => state, subscribe } }) } },
+    uiConversation: { binding: () => ({ target: () => ({ getSnapshot: () => ({ nodes }), subscribe }) }) },
+    inputTriggers: { registerSource: () => () => {} },
+    slots: { entries: (name: string) => name === 'conversation.chat.node' ? [entry] : [], inject: (_: string, fn: () => void) => fn(), register: () => () => {} } }
+  const run = vi.fn(), btw = { t: translate(), store: new BubbleStore({ run, close: async () => ({ kind: 'success', text: '' }) }), isSubagent: () => false }
+  apply(ctx, btw)
+  const mount = document.createElement('div'); mount.dataset.conversationScroll = ''; document.body.append(mount); const root = createRoot(mount)
+  try {
+    await act(async () => root.render(React.createElement(React.Fragment, null,
+      React.createElement(entry.component as any, { node: nodes.get('original'), sessionId: 's1' }),
+      React.createElement(entry.component as any, { node: nodes.get('reply'), sessionId: 's1' }))))
+    const link = mount.querySelector('a')!
+    expect(link.hasAttribute('target')).toBe(false)
+    expect(link.getAttribute('aria-label')).toBe('注释 1：引用原文')
+    await act(async () => { link.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 520)) })
+    expect(document.querySelector('.dca-citation-preview')!.textContent).toContain('引用原文')
+    expect(document.querySelector('.dca-citation-preview')!.textContent).toContain('需要核对')
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    await act(async () => { link.dispatchEvent(click) })
+    expect(click.defaultPrevented).toBe(true)
+    expect(window.getSelection()!.toString()).toBe('引用原文')
+    expect(document.querySelector('.dca-citation-preview')).toBeNull()
+    expect(state.draft).toBe('主对话草稿')
+    expect(run).not.toHaveBeenCalled()
+  } finally {
+    await act(async () => root.unmount()); mount.remove(); effects.reverse().forEach(fn => fn())
+    await btw.store.dispose(); localStorage.clear(); vi.unstubAllGlobals()
+  }
+})

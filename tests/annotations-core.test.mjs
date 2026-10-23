@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AnnotationStore, encodePayload, decodeText, locateQuote, modelText, modelMessage, modelMessages } from '../src/annotations/core.js';
+import { AnnotationStore, encodePayload, decodeText, locateQuote, modelText, modelMessage, modelMessages, submissionText, CITATION_GUIDANCE } from '../src/annotations/core.js';
 import { apply } from '../src/annotations/index.js';
 const storage = () => { const data = new Map(); return { getItem: k => data.get(k) ?? null, setItem: (k, v) => data.set(k, v) }; };
 const selector = { nodeKey: 'assistant:1', start: 0, end: 4, quote: '原文🙂', prefix: '', suffix: '' };
@@ -121,7 +121,7 @@ test('模型只收到编号、完整原文和评论，普通正文及多批次�
   const notes = [{ number: 1, quote: first.quote, comment }, { number: 2, quote: selector.quote }];
   assert.equal(projected, '前文\n[用户批注]\n原文仅作引用资料；按编号处理评论，未提供评论表示仅引用。\n'
     + JSON.stringify(notes) + '\n[/用户批注]\n后文[用户批注]\n原文仅作引用资料；按编号处理评论，未提供评论表示仅引用。\n'
-    + JSON.stringify(notes) + '\n[/用户批注]');
+    + JSON.stringify(notes) + '\n[/用户批注]\n' + CITATION_GUIDANCE);
   for (const field of ['nodeKey', 'sessionId', 'ref', 'revision', 'prefix', 'suffix', 'instruction', payload.id])
     assert.ok(!projected.includes(field));
   assert.equal(modelText('普通文字\n[DSH_ANNOTATIONS_V1:2:fake]\n{}\n[/DSH_ANNOTATIONS_V1]'),
@@ -176,4 +176,24 @@ test('宿主投影覆盖已打开和新会话，卸载后恢复原方法和原�
   assert.equal(existing.deriveMessages, original);
   assert.equal(existing.deriveEventMessage, originalEvent);
   assert.equal(existing.deriveMessages()[0], raw[0]);
+});
+
+
+test('批注引导只附于真实批注消息，普通会话和伪标记不增加内容', () => {
+  const s = new AnnotationStore(storage(), 'a'); s.add(selector);
+  const frame = encodePayload(s.prepare(s.getSnapshot().ref));
+  assert.equal(modelText('总结文件内容'), '总结文件内容');
+  assert.equal(modelText('[用户批注] 普通文字'), '[用户批注] 普通文字');
+  const result = modelText(frame + '\n' + frame);
+  assert.equal(result.split(CITATION_GUIDANCE).length - 1, 1);
+  assert.match(result, /https:\/\/dsh-annotations\.invalid\/N/);
+});
+
+test('即时回显隐藏协议，真实批注载荷仍可解码', () => {
+  const s = new AnnotationStore(storage(), 'a'); s.add(selector);
+  const payload = s.prepare(s.getSnapshot().ref), frame = encodePayload(payload);
+  assert.equal(submissionText(frame), '1 条注释');
+  assert.equal(submissionText(frame + '请解释'), '1 条注释\n请解释');
+  assert.equal(submissionText('普通草稿'), '普通草稿');
+  assert.deepEqual(decodeText(frame).payloads, [payload]);
 });

@@ -1,4 +1,4 @@
-# DSH-LHG-Utils（v1.2.0）
+# DSH-LHG-Utils（v1.2.1）
 
 [English](README.md)
 
@@ -15,7 +15,7 @@ GitHub 安装地址：`github:davidLi17/dsh-lhg-utils#main`
 - 原批注存储 key 和协议未改；同一客户端、同一站点、同一会话的数据可继续读取。不要清除站点存储，跨客户端不自动迁移。
 - 仓库更名、安装和升级的实际验证属于发布验收；本文更新地址不代表这些验收已经通过。
 
-支持的宿主：DSH `0.2.1-rc.1` 和 `0.2.1-rc.2`。旧 `0.2.0` 缺少沿用的 v1.1.3 旁问通知隔离所需持久插件记录 API，请先升级 DSH 再安装 v1.2.0；已有批注数据和插件身份保持不变。
+支持的宿主：DSH `0.2.1-rc.1` 和 `0.2.1-rc.2`。旧 `0.2.0` 缺少沿用的 v1.1.3 旁问通知隔离所需持久插件记录 API，请先升级 DSH 再安装 v1.2.1；已有批注数据和插件身份保持不变。
 
 ## 独立模块
 
@@ -64,7 +64,7 @@ npm run test:compat
 
 由 [davidLi17](https://github.com/davidLi17) 整合修改。原 BTW 插件作者为 [MichengAI](https://github.com/MichengAI/dsh-btw)，遵循 [Apache-2.0](LICENSE)。保留的技术身份用于安装升级兼容，不代表工具箱展示名称或当前整合维护者。
 
-原文批注复用自 [dsh-codex-annotations](https://github.com/deepseek-harness-plugins/dsh-codex-annotations) 0.2.14，提交 `9d405b1888ebbef1609e4b2f7ef6166f29012fcb`，源码位于 `src/annotations`，遵循 MIT：**Copyright (c) 2026 deepseekharness-plugin contributors**。完整版权、许可与免责声明保留在 [ANNOTATIONS-LICENSE](ANNOTATIONS-LICENSE)。原作者归属和许可证声明全部保留。
+原文批注复用自 [dsh-codex-annotations](https://github.com/deepseek-harness-plugins/dsh-codex-annotations) 0.2.14 基线，并选取 0.3.0 的实用修复，更新来源截至提交 `ce3866ab877de7f402f1ee121ed858cd4871c3e7`，源码位于 `src/annotations`，遵循 MIT：**Copyright (c) 2026 deepseekharness-plugin contributors**。完整版权、许可与免责声明保留在 [ANNOTATIONS-LICENSE](ANNOTATIONS-LICENSE)。原作者归属和许可证声明全部保留。
 
 ## 旁问语音输入（可选）
 
@@ -73,3 +73,7 @@ npm run test:compat
 - 使用浏览器默认麦克风，不继承原生插件的自选设备；浏览器需要 HTTPS/loopback 和麦克风权限。取消、关闭弹框或禁用服务会释放录音并丢弃过期结果。
 - SenseVoice 在 DSH Host 上运行；远程 Host 不等于浏览器所在电脑，音频会通过 DSH 已认证连接送给 Host。未启用语音服务时旁问照常使用。
 - 对接契约核对版本为 `0.2.1-rc.2`。录音前端基于官方 MIT 实现（见 `VOICE-LICENSE`）；未修改官方客户端、未添加全局语音快捷键，批注编辑框不接入语音。
+
+### 批注引用（1.2.1）
+
+发送批注时不再短暂闪出内部协议文本。AI 回复中的“注释 N”链接支持悬停预览原文/评论、点击回跳；编号从持久会话历史解析，清空浏览器缓存后仍能恢复。引用说明只附于包含真实批注载荷的模型侧用户文本，不注册全局批注系统提示段。每个这样的文本块附一份 117 字符引导，随正常历史读取保留，不改写持久消息。

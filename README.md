@@ -1,4 +1,4 @@
-# DSH-LHG-Utils (v1.2.0)
+# DSH-LHG-Utils (v1.2.1)
 
 [简体中文](README.zh-CN.md)
 
@@ -15,7 +15,7 @@ GitHub installation address: `github:davidLi17/dsh-lhg-utils#main`
 - Existing annotation storage keys and protocols are unchanged. Data remains available in the same client, site, and session; do not clear site storage. Cross-client migration is not automatic.
 - Repository rename and installation/upgrade verification are release checks, not implied by the updated address in this document.
 
-Supported hosts: DSH `0.2.1-rc.1` and `0.2.1-rc.2`. Earlier `0.2.0` hosts lack the durable plugin-record APIs required by the retained v1.1.3 BTW notification isolation. Upgrade DSH before installing v1.2.0; saved annotations and plugin identity remain unchanged.
+Supported hosts: DSH `0.2.1-rc.1` and `0.2.1-rc.2`. Earlier `0.2.0` hosts lack the durable plugin-record APIs required by the retained v1.1.3 BTW notification isolation. Upgrade DSH before installing v1.2.1; saved annotations and plugin identity remain unchanged.
 
 ## Modules
 
@@ -64,7 +64,7 @@ npm run test:compat
 
 Integrated and modified by [davidLi17](https://github.com/davidLi17). The original BTW plugin is by [MichengAI](https://github.com/MichengAI/dsh-btw), under [Apache-2.0](LICENSE). The retained technical identities identify the compatible installation, not the toolbox's display name or current integrator.
 
-Annotations reuse [dsh-codex-annotations](https://github.com/deepseek-harness-plugins/dsh-codex-annotations), version 0.2.14, commit `9d405b1888ebbef1609e4b2f7ef6166f29012fcb`. Source is in `src/annotations`, under MIT: **Copyright (c) 2026 deepseekharness-plugin contributors**. The complete copyright, permission notice, and warranty disclaimer remain in [ANNOTATIONS-LICENSE](ANNOTATIONS-LICENSE). Original authorship and license notices are preserved.
+Annotations reuse [dsh-codex-annotations](https://github.com/deepseek-harness-plugins/dsh-codex-annotations), baseline 0.2.14 plus selected 0.3.0 fixes, through commit `ce3866ab877de7f402f1ee121ed858cd4871c3e7`. Source is in `src/annotations`, under MIT: **Copyright (c) 2026 deepseekharness-plugin contributors**. The complete copyright, permission notice, and warranty disclaimer remain in [ANNOTATIONS-LICENSE](ANNOTATIONS-LICENSE). Original authorship and license notices are preserved.
 
 ## Optional side-question voice input
 
@@ -73,3 +73,7 @@ Annotations reuse [dsh-codex-annotations](https://github.com/deepseek-harness-pl
 - Uses the browser's default microphone, not the native plugin's custom device choice. HTTPS/loopback and microphone permission are required. Cancel, dialog closure and service unload release recording and invalidate late results.
 - SenseVoice runs on the DSH Host, which may be a different computer from the browser. Audio goes to that Host over DSH's authenticated connection. Without native speech, ordinary side questions remain available.
 - The speech contract was checked against `0.2.1-rc.2`. Capture code is adapted from the official MIT implementation (see `VOICE-LICENSE`). No official-client changes, global voice shortcut or dictation in annotation editing fields.
+
+### Annotation references (1.2.1)
+
+Submitted annotations no longer flash their serialized protocol in the optimistic echo. In replies, hover “注释 N” links to preview the original text/comment and click to return to the source. Numbers resolve from durable conversation history, including after clearing browser storage. Citation guidance is added only to model-facing user text containing actual annotation payloads; no citation system-prompt section is installed. Each such text block carries one 117-character instruction, preserved through normal history reads without rewriting durable messages.

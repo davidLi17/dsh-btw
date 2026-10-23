@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] - 2026-10-23
+
+- Select annotation 0.3.0 upstream fixes: clean optimistic submission echo, reply citation previews/navigation and durable history numbering. Keep the native fallback on hosts without `beginSubmission`.
+- Provide citation guidance only with actual annotation text, without adding a global system-prompt section. Preserve BTW, voice, shortcuts, annotation save focus and existing data.
+- Retain upstream MIT attribution; no new runtime dependency or Git prepare script.
+
 ## [1.2.0] - 2026-10-22
 
 - Optional native speech in the side-question dialog: default microphone, draft-only transcription, conflict preservation, cancellation and disposal; retain the upstream capture implementation’s MIT license.
