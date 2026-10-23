@@ -7,6 +7,7 @@ import { capture, restoreRange } from './ranges.js';
 import { readingViewport, revealQuote } from './navigation.js';
 import css from './styles.css?inline';
 import { decorateSlot } from './slot-decoration.js';
+import { createSidechatBridge } from './sidechat-bridge.js';
 import { CITATION_SELECTOR, citationNumber } from './citations.js';
 
 export const inject = ['slots', 'sessions', 'conversation', 'uiConversation', 'inputTriggers'];
@@ -90,7 +91,9 @@ function AnnotationList({ notes, face, anchor, close, edit, editable = true, hov
   </Float>;
 }
 
-function Assistant({ inner: Inner, dca: face, btw, ...props }) {
+function Assistant({ inner: Inner, dca: face, btw, sidechat, ...props }) {
+  const sidebar = snapshot(sidechat);
+  const [sidechatError, setSidechatError] = useState(null);
   const btwEnabled = useSyncExternalStore(btw.subscribe ?? (() => () => {}), btw.getSnapshot ?? (() => true));
   const root = useRef(null), source = useRef(null);
   const view = snapshot(face.store);
@@ -237,7 +240,14 @@ function Assistant({ inner: Inner, dca: face, btw, ...props }) {
     {selection && !open && <Float anchor={anchor} align="center" className="dca-menu" onDismiss={close}>
       <button onClick={() => { const note = face.add(selection.selector); if (note) { setOpen({ note, compact: true }); window.getSelection()?.removeAllRanges(); } }}>添加到对话</button>
       {btwEnabled && !btw.isSubagent(face.sessionId) && <button onClick={() => { setBtwReference(selection.selector.quote); close(); }}>{btw.t('selection.btw')}</button>}
+      {sidebar && <button onClick={async () => {
+        const text = selection.selector.quote;
+        close(); setSidechatError(null);
+        try { await sidebar.appendSidechatDraft({ sessionId: face.sessionId, text, requestId: crypto.randomUUID() }); }
+        catch (error) { setSidechatError(error instanceof Error ? error.message : String(error)); }
+      }}>加入到侧边对话</button>}
     </Float>}
+    {sidechatError && <div className="dca-notice" role="alert"><span>{sidechatError}</span><button aria-label="关闭提示" onClick={() => setSidechatError(null)}>×</button></div>}
     {btwEnabled && btwReference !== null && <SelectionAsk voice={btw.voice} store={btw.store} sessionId={face.sessionId} t={btw.t} initialReference={btwReference} onDismiss={() => setBtwReference(null)} />}
     {open && active && <Editor key={active.id} note={active} face={face} anchor={anchor} close={close} initiallyExpanded={!open.compact}
       avoid={() => root.current.querySelector(`[data-dca-marker="${CSS.escape(active.id)}"]`)?.getBoundingClientRect()}
@@ -297,6 +307,7 @@ function User({ inner: Inner, dca: face, ...props }) {
 
 export function apply(ctx, btw) {
   const runtime = createRuntime(ctx);
+  const sidechat = createSidechatBridge(ctx);
   const style = document.createElement('style'); style.dataset.plugin = '@michengai/dsh-btw'; style.dataset.pluginCss = '@michengai/dsh-btw/annotations.css'; style.textContent = css;
   document.head.append(style);
   ctx.effect(() => () => { runtime.dispose(); style.remove(); });
@@ -315,7 +326,7 @@ export function apply(ctx, btw) {
         // Only the response owns quote navigation; the folded reasoning seat
         // otherwise reports a false missing-quote warning alongside the editor.
         if (!active || Wrapper === Assistant && props.groupPart === 'reasoning') return React.createElement(original, props);
-        return <Wrapper {...props} dca={props.sessionId === undefined ? null : runtime.faceFor(props.sessionId)} inner={original} {...(Wrapper === Assistant ? { btw } : {})}/>;
+        return <Wrapper {...props} dca={props.sessionId === undefined ? null : runtime.faceFor(props.sessionId)} inner={original} {...(Wrapper === Assistant ? { btw, sidechat } : {})}/>;
       });
       registrations.set(entry, release);
     }

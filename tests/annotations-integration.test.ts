@@ -173,3 +173,97 @@ it('回复内批注链接悬停预览、点击回跳，不导航外网或启动�
     await btw.store.dispose(); localStorage.clear(); vi.unstubAllGlobals()
   }
 })
+
+it('第三入口可选联动侧聊，连续追加且不触发旁问或主输入框回焦', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  Range.prototype.getBoundingClientRect = () => ({ left: 100, top: 150, bottom: 170, right: 250, width: 150, height: 20 } as DOMRect)
+  Range.prototype.getClientRects = () => [Range.prototype.getBoundingClientRect()] as unknown as DOMRectList
+  HTMLElement.prototype.scrollIntoView = () => {}
+  vi.stubGlobal('matchMedia', () => ({ matches: true }))
+  vi.stubGlobal('CSS', { escape: (s: string) => s })
+  HTMLElement.prototype.scrollBy = () => {}
+  localStorage.clear()
+  const cleanups: (() => void)[] = []
+  const effect = (fn: () => (() => void)) => { const off = fn(); cleanups.push(off); return off }
+  const state = { phase: 'idle', draft: '已有主对话草稿', draftRev: 0, occurrences: [] as any[] }
+  const composer = document.createElement('textarea'); document.body.append(composer)
+  const focus = vi.fn(() => composer.focus())
+  const subscribe = () => () => {}
+  let source: any
+  const binding = { ctx: { effect, bail: (_ctx: unknown, event: string, value: any) => {
+    if (event === 'slash/input-insert-reference') state.occurrences.push({ ...value.reference, offset: 0, length: 1 })
+    return true
+  } }, session: { projections: { faceOf: () => ({ getSnapshot: () => ({}), subscribe }) } } }
+  const entry = { options: { key: 'assistant-step', priority: 0 }, component: () => React.createElement('p', null, '用于批注与旁问的原文') }
+  const sideInput = document.createElement('textarea'); sideInput.value = '已有侧聊草稿'; document.body.append(sideInput)
+  const appendSidechatDraft = vi.fn(({ text }: { text: string }) => { sideInput.value += '\n\n' + text; sideInput.focus(); sideInput.setSelectionRange(sideInput.value.length, sideInput.value.length) })
+  let connect: (scope: any) => void = () => {}
+  const ctx = { inject: (_deps: string[], fn: (scope: any) => void) => { connect = fn }, effect, on: () => () => {}, sessions: { binding: () => binding },
+    conversation: { input: { for: () => ({ state: { getSnapshot: () => state, subscribe }, focus }) } },
+    uiConversation: { binding: () => ({ target: () => ({ getSnapshot: () => ({ nodes: new Map() }), subscribe }) }) },
+    inputTriggers: { registerSource: (value: any) => { source = value; return () => {} } },
+    slots: { entries: (name: string) => name === 'conversation.chat.node' ? [entry] : [], inject: (_name: string, fn: () => void) => fn(), register: () => () => {} } }
+  const run = vi.fn(async () => ({ kind: 'success' as const, text: '旁问回答' }))
+  const store = new BubbleStore({ run, close: async () => ({ kind: 'success', text: '' }) })
+  const t = translate()
+  let btwEnabled = true
+  const btwListeners = new Set<() => void>()
+  const setBtwEnabled = async (value: boolean) => {
+    await act(async () => { btwEnabled = value; for (const listener of btwListeners) listener() })
+  }
+  apply(ctx, { store, t, isSubagent: () => false, getSnapshot: () => btwEnabled,
+    subscribe: (listener: () => void) => { btwListeners.add(listener); return () => btwListeners.delete(listener) } })
+  const scope = document.createElement('div'); scope.dataset.conversationScroll = ''; document.body.append(scope)
+  const root = createRoot(scope)
+  try {
+    await act(async () => root.render(React.createElement(React.Fragment, null,
+      React.createElement(entry.component as any, { node: { key: 'a1' }, sessionId: 's1' }),
+      React.createElement(SelectionAsk, { store, t, sessionId: 's1' }))))
+    const select = async () => {
+      const p = scope.querySelector('p')!
+      const range = document.createRange(); range.selectNodeContents(p)
+      window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range)
+      await act(async () => {
+        p.dispatchEvent(new Event('pointerup', { bubbles: true }))
+        p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+        await new Promise(resolve => setTimeout(resolve, 5))
+      })
+    }
+    await select()
+    expect(document.querySelector('.dca-menu')!.textContent).toBe('添加到对话旁问')
+    // Older Sidebar version must not expose an action it cannot fulfill.
+    await act(async () => connect({ get: () => ({}), effect }))
+    expect(document.querySelector('.dca-menu')!.textContent).toBe('添加到对话旁问')
+    const releases: (() => void)[] = []
+    await act(async () => connect({ get: () => ({ appendSidechatDraft }), effect: (fn: () => () => void) => releases.push(fn()) }))
+    expect(document.querySelector('.dca-menu')!.textContent).toBe('添加到对话旁问加入到侧边对话')
+    for (let i = 0; i < 2; i++) {
+      await select()
+      await act(async () => ([...document.querySelectorAll('.dca-menu button')].find(b => b.textContent === '加入到侧边对话') as HTMLButtonElement).click())
+      expect(document.activeElement).toBe(sideInput)
+      expect(sideInput.selectionStart).toBe(sideInput.value.length)
+    }
+    expect(appendSidechatDraft).toHaveBeenCalledTimes(2)
+    expect(appendSidechatDraft).toHaveBeenLastCalledWith({ sessionId: 's1', text: '用于批注与旁问的原文', requestId: expect.any(String) })
+    expect(sideInput.value).toBe('已有侧聊草稿\n\n用于批注与旁问的原文\n\n用于批注与旁问的原文')
+    expect(focus).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+    expect(state.draft).toBe('已有主对话草稿')
+    expect(state.occurrences).toEqual([])
+    await setBtwEnabled(false)
+    await select()
+    expect(document.querySelector('.dca-menu')!.textContent).toBe('添加到对话加入到侧边对话')
+    // A rejected append is visible and must not redirect focus to main input.
+    appendSidechatDraft.mockImplementationOnce(() => { throw new Error('侧边对话已关闭') })
+    await act(async () => ([...document.querySelectorAll('.dca-menu button')].find(b => b.textContent === '加入到侧边对话') as HTMLButtonElement).click())
+    expect(document.querySelector('[role="alert"]')!.textContent).toContain('侧边对话已关闭')
+    expect(focus).not.toHaveBeenCalled()
+    await act(async () => releases.reverse().forEach(fn => fn()))
+    await select()
+    expect(document.querySelector('.dca-menu')!.textContent).toBe('添加到对话')
+  } finally {
+    await act(async () => root.unmount()); scope.remove(); composer.remove(); sideInput.remove()
+    cleanups.reverse().forEach(fn => fn()); await store.dispose(); vi.unstubAllGlobals()
+  }
+})

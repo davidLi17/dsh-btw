@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.2] - 2026-10-23
+
+- Add an independent “加入到侧边对话” selection action through an optional Better Sidebar draft capability. Repeated selections append without sending or restoring main-composer focus.
+- Hide the action when the capability is unavailable; preserve annotations, BTW, voice, and tool behavior.
+
 ## [1.2.1] - 2026-10-23
 
 - Select annotation 0.3.0 upstream fixes: clean optimistic submission echo, reply citation previews/navigation and durable history numbering. Keep the native fallback on hosts without `beginSubmission`.
