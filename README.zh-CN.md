@@ -1,8 +1,17 @@
-# DSH-LHG-Utils（v1.2.1）
+# DSH-LHG-Utils（v1.2.3）
 
 [English](README.md)
 
 **LHG Utils** 是模块独立的 DeepSeek Harness 工具箱，包含 BTW 独立旁问、Codex 原文批注和原生思考强度快捷键。
+
+## /recap
+
+在主对话输入 `/recap` 并按 Enter，或在原生 `/` 菜单选择它，即会填写并自动发送以下两行。仅打字不会发送；`/recap` 后附其他文字不会作为该命令触发。沿用宿主原生发送和失败处理，不添加全局按键监听或常驻提示词。
+
+```text
+1. 对话主线 recap，整理其中信息。
+2. 给我对我最重要的信息。
+```
 
 ## 安装与升级
 

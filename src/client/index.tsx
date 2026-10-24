@@ -1,3 +1,4 @@
+import { applyRecap } from './recap'
 import { apply as applyEffortShortcuts } from './effort-shortcuts'
 import { moduleLifecycle, moduleSettings, SETTINGS_NAMESPACE } from '../module-settings'
 import { apply as applyAnnotations } from '../annotations/client.jsx'
@@ -122,6 +123,7 @@ type BtwBridge = {
 }
 
 export async function apply(ctx: Context, config: unknown = {}): Promise<void> {
+  applyRecap(ctx)
   ctx.effect(() => ctx.locale.register(NS, { zh, en }))
   const sessions = ctx.get('sessions') as unknown as ISessions
   const listeners = new Set<() => void>()

@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.3] - 2026-10-24
+
+- Add native `/recap`: submitting the bare command or selecting its menu item fills and sends the two-line recap prompt to the main conversation. No typing-triggered send, global key listener, or persistent prompt.
+
 ## [1.2.2] - 2026-10-23
 
 - Add an independent “加入到侧边对话” selection action through an optional Better Sidebar draft capability. Repeated selections append without sending or restoring main-composer focus.

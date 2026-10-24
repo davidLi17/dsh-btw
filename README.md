@@ -1,8 +1,17 @@
-# DSH-LHG-Utils (v1.2.1)
+# DSH-LHG-Utils (v1.2.3)
 
 [简体中文](README.zh-CN.md)
 
 **LHG Utils** is a modular DeepSeek Harness toolbox: BTW side questions, Codex-style text annotations, and native reasoning-effort shortcuts.
+
+## /recap
+
+Submit `/recap` in the main composer or select it from the native `/` menu to fill and automatically send these two lines. Typing alone does not send; longer `/recap ...` text is not a bare invocation. Uses native composer submission and error handling, without global key listeners or persistent system prompts.
+
+```text
+1. 对话主线 recap，整理其中信息。
+2. 给我对我最重要的信息。
+```
 
 ## Install or upgrade
 
