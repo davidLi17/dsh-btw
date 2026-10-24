@@ -308,7 +308,7 @@ function User({ inner: Inner, dca: face, ...props }) {
 export function apply(ctx, btw) {
   const runtime = createRuntime(ctx);
   const sidechat = createSidechatBridge(ctx);
-  const style = document.createElement('style'); style.dataset.plugin = '@michengai/dsh-btw'; style.dataset.pluginCss = '@michengai/dsh-btw/annotations.css'; style.textContent = css;
+  const style = document.createElement('style'); style.dataset.plugin = '@davidli/dsh-lhg-btw'; style.dataset.pluginCss = '@davidli/dsh-lhg-btw/annotations.css'; style.textContent = css;
   document.head.append(style);
   ctx.effect(() => () => { runtime.dispose(); style.remove(); });
   ctx.effect(() => ctx.inputTriggers.registerSource(runtime.source));

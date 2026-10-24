@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { verifyNpmOidc } from '../scripts/verify-npm-oidc.mjs'
 
-const options = { packageName: '@michengai/dsh-btw', requestUrl: 'https://example.test/oidc?request=1', requestToken: 'test-request-token' }
+const options = { packageName: '@davidli/dsh-lhg-btw', requestUrl: 'https://example.test/oidc?request=1', requestToken: 'test-request-token' }
 const response = body => ({ ok: true, json: async () => body })
 
 test('只获取 GitHub 身份并交换 npm 凭据，不执行发布或返回令牌', async () => {
@@ -17,7 +17,7 @@ test('只获取 GitHub 身份并交换 npm 凭据，不执行发布或返回令�
   assert.equal(calls[0].url.searchParams.get('request'), '1')
   assert.equal(calls[0].init.headers.Authorization, 'Bearer test-request-token')
   assert.equal(calls[1].url.origin, 'https://registry.npmjs.org')
-  assert.equal(decodeURIComponent(calls[1].url.pathname), '/-/npm/v1/oidc/token/exchange/package/@michengai/dsh-btw')
+  assert.equal(decodeURIComponent(calls[1].url.pathname), '/-/npm/v1/oidc/token/exchange/package/@davidli/dsh-lhg-btw')
   assert.equal(calls[1].init.method, 'POST')
   assert.equal(calls[1].init.headers.Authorization, 'Bearer test-identity')
   assert.ok(calls.every(call => call.init.signal instanceof AbortSignal))

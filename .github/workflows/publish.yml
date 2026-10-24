@@ -58,7 +58,7 @@ jobs:
           node scripts/release-notes.mjs $tag artifacts/release-notes.md
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
-          "NPM_PACKAGE_FILE=./artifacts/michengai-dsh-btw-$($package.version).tgz" >> $env:GITHUB_ENV
+          "NPM_PACKAGE_FILE=./artifacts/davidli-dsh-lhg-btw-$($package.version).tgz" >> $env:GITHUB_ENV
       - name: 安装锁定依赖
         run: npm ci --ignore-scripts --registry=https://registry.npmjs.org/
       - name: 构建
@@ -73,7 +73,7 @@ jobs:
       - name: 保存 CI 安装包与双语说明
         uses: actions/upload-artifact@v4
         with:
-          name: dsh-btw-${{ github.run_id }}
+          name: dsh-lhg-btw-${{ github.run_id }}
           path: |
             artifacts/*.tgz
             artifacts/release-notes.md

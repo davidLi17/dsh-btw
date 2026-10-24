@@ -1,4 +1,4 @@
-# DSH-LHG-Utils（v1.2.3）
+# DSH-LHG-Utils（v1.2.4）
 
 [English](README.md)
 
@@ -19,10 +19,28 @@
 
 GitHub 安装地址：`github:davidLi17/dsh-lhg-utils#main`
 
-- 请更新已有安装，不要同时通过新旧仓库地址安装两份插件。npm 技术包名 `@michengai/dsh-btw`、Cordis 组件 ID `michengai-btw` 和 `/btw` 命令保持不变，以兼容已有安装。
+包名现为 `@davidli/dsh-lhg-btw`，仓库地址不变。本次改名通过 GitHub 分发，不包含 npm registry 发布；安装源仍使用上面的 GitHub 地址。
+
+### 从旧包名迁移（仅需一次）
+
+不要直接把新包叠加在旧包上：包管理器按 npm 包名区分依赖，两个包会同时存在，而它们刻意共用一个 Cordis 组件 ID。
+
+1. 先备份当前 profile 的 `package.json`、`pnpm-lock.yaml` 和 `cordis.patch.yml`（如存在），记录插件的启用状态与 bundle 顺序，再停止对应的 DSH Host。Desktop 应完全退出。
+2. 在**同一个原 profile** 先移除旧包，再添加同一 GitHub 地址。以下以 `tui` 为例；两条命令的 `tui` 都必须替换成你实际使用的 profile，不能省略。Desktop 用户先在应用菜单「Manage dsh Command…」安装其自带 `dsh`，再完全退出应用，并在两条命令中使用 `--profile desktop`；普通 npm CLI 不支持管理 desktop profile。
+
+```sh
+dsh plugin --profile tui remove @michengai/dsh-btw
+dsh plugin --profile tui add github:davidLi17/dsh-lhg-utils#main
+```
+
+3. 检查当前 profile 的 `cordis.patch.yml`，以及 DSH home 和自定义 `--patch` 覆写（包括原生设置页生成的配置）：若条目同时按 `id: michengai-btw` 和旧 `name: '@michengai/dsh-btw'` 匹配，只把该包名改成 `@davidli/dsh-lhg-btw`；`id`、`config` 和 `disabled` 原样保留。只按 ID 匹配的配置不用改。不要全局替换 `michengai-btw` 或批注存储键。
+4. 移除/添加会把新包加到 bundle 列表末尾并设为启用；如原来禁用或调整过顺序，按备份恢复对应状态/顺序。确认依赖和 bundle 列表不再含旧包，只有新包，然后重启 Host 并刷新客户端。若添加失败，先修复安装，不要清空 profile、会话或浏览器存储。
+
+DSH `0.2.1-rc.1` / `rc.2` 的上述 CLI 操作不删除 `cordis.patch.yml` 或会话数据。插件继续使用 Cordis ID `michengai-btw`、原配置命名空间、旁问持久记录及批注存储协议，`/btw`、`/recap` 等功能不变。后续已用新包名的安装仍从同一 GitHub 地址更新，无需再移除旧包。
+
 - 使用整合的批注模块前，请关闭独立的 `dsh-codex-annotations`，避免重复工具栏和重复处理。
 - 原批注存储 key 和协议未改；同一客户端、同一站点、同一会话的数据可继续读取。不要清除站点存储，跨客户端不自动迁移。
-- 仓库更名、安装和升级的实际验证属于发布验收；本文更新地址不代表这些验收已经通过。
+- 隔离包安装/迁移检查不等于真实 Desktop/Web 操作验收；实际客户端验收状态见下文。
 
 支持的宿主：DSH `0.2.1-rc.1` 和 `0.2.1-rc.2`。旧 `0.2.0` 缺少沿用的 v1.1.3 旁问通知隔离所需持久插件记录 API，请先升级 DSH 再安装 v1.2.1；已有批注数据和插件身份保持不变。
 

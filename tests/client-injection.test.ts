@@ -25,7 +25,8 @@ it('真实 Cordis 依赖检查下可通过官方指令目录发送旁问', async
   let implementation = clientPlugin
   const fallback = createRequire(import.meta.url)
   const safeRequire = ((id: string) => id === '@deepseek-ai/dsh-client-ui-primitives' ? { Modal: () => null, Button: () => null } : fallback(id)) as typeof fallback
-  const loader = { load: (entry: { factory: (require: typeof fallback) => typeof clientPlugin }) => {
+  const loader = { load: (entry: { id: string; factory: (require: typeof fallback) => typeof clientPlugin }) => {
+    expect(entry.id).toBe('@davidli/dsh-lhg-btw')
     implementation = entry.factory(safeRequire)
   } }
   class Remote extends Service {
@@ -108,8 +109,8 @@ it('真实 Cordis 依赖检查下可通过官方指令目录发送旁问', async
     })
     expect(injectedStyles).toHaveLength(2)
     expect(injectedStyles.find(s => s.dataset.michengaiBtw === '')?.dataset).toMatchObject({
-      plugin: '@michengai/dsh-btw',
-      pluginCss: '@michengai/dsh-btw/client.css',
+      plugin: '@davidli/dsh-lhg-btw',
+      pluginCss: '@davidli/dsh-lhg-btw/client.css',
       michengaiBtw: '',
     })
   } finally {
@@ -184,14 +185,14 @@ it('DSH 0.2.0-rc.2 claimStyles 不会误认领或因其他插件卸载而摘除 
 
   const btwStyle = allStyles.find(s => s.dataset.michengaiBtw !== undefined)
   expect(btwStyle).toBeDefined()
-  expect(btwStyle.dataset.plugin).toBe('@michengai/dsh-btw')
-  expect(btwStyle.dataset.pluginCss).toBe('@michengai/dsh-btw/client.css')
+  expect(btwStyle.dataset.plugin).toBe('@davidli/dsh-lhg-btw')
+  expect(btwStyle.dataset.pluginCss).toBe('@davidli/dsh-lhg-btw/client.css')
   expect(btwStyle.textContent).toContain('.btw-selection-dialog,.btw-selection-menu{position:fixed;box-sizing:border-box;background:var(--dsw-alias-bg-layer-2)')
   expect(btwStyle.textContent).toContain('.btw-bubble{background:var(--dsw-alias-bg-layer-2)')
 
   // 模拟宿主加载另一个插件
   hostClaimStyles('other-theme-plugin')
-  expect(btwStyle.dataset.plugin).toBe('@michengai/dsh-btw')
+  expect(btwStyle.dataset.plugin).toBe('@davidli/dsh-lhg-btw')
 
   // 模拟另一个插件卸载/重载触发样式清理
   hostRemoveOwnedStyles('other-theme-plugin')

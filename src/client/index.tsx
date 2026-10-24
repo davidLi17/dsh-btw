@@ -206,8 +206,8 @@ function applyBtwClient(ctx: Context, bridge: BtwBridge): void {
 
   ctx.effect(() => {
     const style = document.createElement('style')
-    style.dataset.plugin = '@michengai/dsh-btw'
-    style.dataset.pluginCss = '@michengai/dsh-btw/client.css'
+    style.dataset.plugin = '@davidli/dsh-lhg-btw'
+    style.dataset.pluginCss = '@davidli/dsh-lhg-btw/client.css'
     style.dataset.michengaiBtw = ''
     style.textContent = CSS
     ;(document.head ?? document.documentElement).append(style)

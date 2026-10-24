@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.4] - 2026-10-24
+
+- Rename the npm package identity to `@davidli/dsh-lhg-btw`; update package resolution, client loader/CSS ownership, lock metadata and the release archive name. Preserve Cordis ID `michengai-btw`, configuration and data keys, `/btw`, `/recap`, and original author/license notices. Existing installations require a one-time package migration; the GitHub repository stays unchanged.
+
 ## [1.2.3] - 2026-10-24
 
 - Add native `/recap`: submitting the bare command or selecting its menu item fills and sends the two-line recap prompt to the main conversation. No typing-triggered send, global key listener, or persistent prompt.
