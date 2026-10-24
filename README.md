@@ -1,4 +1,4 @@
-# DSH-LHG-Utils (v1.2.4)
+# DSH-LHG-Utils (v1.2.5)
 
 [简体中文](README.zh-CN.md)
 
@@ -53,6 +53,8 @@ All three modules are enabled by default and can be switched independently. Open
 Select assistant text and choose **Side Ask**, or use `/btw`. Questions appear in independent bubbles, inherit conversation context, and keep existing host tool permissions. They do not automatically send annotations to the main conversation.
 
 New side questions created since v1.1.3 have persistent identity markers. Their completion notifications enter the main session as reference context without waking an idle main agent; an already-running agent may read that context at its next step. Ordinary subtask notifications, user messages, and cleanup are unchanged. Older side questions lack reliable markers and are not migrated by title: create a fresh side question when testing notification isolation and keep the plugin enabled.
+
+Since v1.2.5, **Open in sidebar** opens the exact existing BTW child in the host's native right-side conversation, the same surface used by Better Sidebar's Tasks page. It works while answering and after completion, preserving native history, streaming, drafts and attachments without sending, rerunning or creating another child. Repeated opens reuse the tab. Closing the sidebar does not close the bubble; the bubble's explicit Stop action still stops the answer. An unavailable host surface reports a clear error rather than starting a replacement. Old bubbles without a request binding are not guessed by title.
 
 ### Text annotations
 

@@ -1,15 +1,17 @@
 import React, { useMemo, useState, useSyncExternalStore } from 'react'
-import { Check, ChevronDown, ChevronUp, Copy, LoaderCircle, MessageCircle, Square, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Copy, LoaderCircle, MessageCircle, PanelRightOpen, Square, X } from 'lucide-react'
 import { AnswerMarkdown } from './answer-markdown'
 import type { Bubble, BubbleStore } from './bubbles'
 import type { BtwTranslate } from '../locales'
 
-export function BubbleView({ item, close, t, collapsed, onToggleCollapse }: {
+export function BubbleView({ item, close, t, collapsed, onToggleCollapse, openInSidebar, sidebarAvailable = true }: {
   item: Bubble
   close: () => void
   t: BtwTranslate
   collapsed: boolean
   onToggleCollapse: () => void
+  openInSidebar?: () => void
+  sidebarAvailable?: boolean
 }): React.JSX.Element {
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState(false)
@@ -33,6 +35,18 @@ export function BubbleView({ item, close, t, collapsed, onToggleCollapse }: {
       <span className="btw-symbol"><MessageCircle size={16} /></span>
       <span className="btw-question">{item.question}</span>
       <div className="btw-actions">
+        {openInSidebar && <button
+          type="button"
+          className="btw-action-sidebar"
+          title={t('action.openSidebar')}
+          aria-label={t('action.openSidebar')}
+          aria-busy={Boolean(item.sidebarOpening)}
+          disabled={!sidebarAvailable || item.sidebarOpening || item.phase === 'closing'}
+          onClick={openInSidebar}
+        >
+          {item.sidebarOpening ? <LoaderCircle size={16} className="btw-spinner" /> : <PanelRightOpen size={16} />}
+          <span>{t('action.openSidebar')}</span>
+        </button>}
         {item.answer && <button type="button" title={t(copied ? 'action.copied' : 'action.copy')} aria-label={t('action.copy')} onClick={() => { void copy() }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>}
         <button type="button" title={t(collapsed ? 'action.expand' : 'action.collapse')} aria-label={t(collapsed ? 'action.expand' : 'action.collapse')} aria-expanded={!collapsed} onClick={onToggleCollapse}>{collapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button>
         <button
@@ -49,8 +63,11 @@ export function BubbleView({ item, close, t, collapsed, onToggleCollapse }: {
     </header>
     {!collapsed && item.reference && <details className="btw-reference"><summary>{t('selection.reference')}</summary><blockquote>{item.reference}</blockquote></details>}
     {busy && <div className="btw-status" role="status"><LoaderCircle size={14} className="btw-spinner" />{t(item.phase === 'closing' ? 'status.closing' : 'status.answering')}</div>}
+    {item.sidebarOpening && <p className="btw-sidebar-status" role="status">{t('status.openingSidebar')}</p>}
+    {openInSidebar && !sidebarAvailable && <p className="btw-sidebar-status">{t('error.sidebarUnavailable')}</p>}
     {!collapsed && item.answer && <div className="btw-answer"><AnswerMarkdown text={item.answer} labels={labels} imageLabel={t('bubble.image')} /></div>}
     {item.error && <p className="btw-error" role="alert">{item.closeFailed ? t('error.close', { detail: item.error }) : item.error}</p>}
+    {item.sidebarError && <p className="btw-error" role="alert">{item.sidebarError}</p>}
     {copyError && <p className="btw-error" role="alert">{t('error.copy')}</p>}
   </article>
 }
@@ -88,6 +105,8 @@ export function BubbleDock({ store, sessionId, t }: { store: BubbleStore; sessio
           else setManual({ id: item.id, knownIds: currentIds })
         }}
         close={() => { void store.close(item.id) }}
+        openInSidebar={() => { void store.openInSidebar(item.id) }}
+        sidebarAvailable={store.isSidebarAvailable()}
       />
     ))}
   </div>

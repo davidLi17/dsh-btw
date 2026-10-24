@@ -5,6 +5,84 @@ import { translate } from '../src/locales'
 const tick = () => new Promise<void>(resolve => setImmediate(resolve))
 afterEach(() => { vi.useRealTimers() })
 
+it('同一旁问的重复打开共用等待，不重跑问题；成功保留气泡和答案', async () => {
+  let finishOpen!: () => void
+  const openInSidebar = vi.fn(() => new Promise<void>(resolve => { finishOpen = resolve }))
+  const run = vi.fn().mockResolvedValue({ kind: 'success', text: '原回答' })
+  const close = vi.fn().mockResolvedValue({ kind: 'success', text: '' })
+  const store = new BubbleStore({ run, close, openInSidebar })
+  const id = await store.ask('original-parent', '原问题')
+  await tick()
+  const first = store.openInSidebar(id)
+  const second = store.openInSidebar(id)
+  expect(first).toBe(second)
+  expect(store.getSnapshot()[0]).toMatchObject({ sidebarOpening: true, phase: 'done', answer: '原回答' })
+  await tick()
+  expect(openInSidebar).toHaveBeenCalledExactlyOnceWith('original-parent', id, expect.any(AbortSignal))
+  finishOpen()
+  await first
+  expect(store.getSnapshot()[0]).toMatchObject({ sidebarOpening: false, phase: 'done', answer: '原回答' })
+  expect(run).toHaveBeenCalledOnce()
+  expect(close).not.toHaveBeenCalled()
+})
+
+it('侧边栏打开失败独立提示，原答案与阶段不变，可重试且不重发', async () => {
+  const openInSidebar = vi.fn().mockRejectedValueOnce(new Error('尚未就绪')).mockResolvedValueOnce(undefined)
+  const run = vi.fn().mockResolvedValue({ kind: 'success', text: '保留回答' })
+  const store = new BubbleStore({ run, close: async () => ({ kind: 'success', text: '' }), openInSidebar })
+  const id = await store.ask('parent', '问题')
+  await tick()
+  await store.openInSidebar(id)
+  expect(store.getSnapshot()[0]).toMatchObject({ phase: 'done', answer: '保留回答', sidebarError: '尚未就绪', sidebarOpening: false })
+  await store.openInSidebar(id)
+  expect(store.getSnapshot()[0]?.sidebarError).toBeUndefined()
+  expect(run).toHaveBeenCalledOnce()
+})
+
+it('Stop 取消原回答与等待中的打开，侧边栏本身不关闭且迟到结果不复活气泡', async () => {
+  let runSignal!: AbortSignal, openSignal!: AbortSignal, finishOpen!: () => void
+  const run = vi.fn((_session: string, _id: string, _question: string, signal: AbortSignal) => {
+    runSignal = signal
+    return new Promise<never>((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('已停止')), { once: true }))
+  })
+  const close = vi.fn().mockResolvedValue({ kind: 'success', text: '' })
+  const openInSidebar = vi.fn((_session: string, _id: string, signal: AbortSignal) => {
+    openSignal = signal
+    return new Promise<void>(resolve => { finishOpen = resolve })
+  })
+  const store = new BubbleStore({ run, close, openInSidebar })
+  const id = await store.ask('parent', '还在回答')
+  const opening = store.openInSidebar(id)
+  await tick()
+  await store.close(id)
+  expect(runSignal.aborted).toBe(true)
+  expect(openSignal.aborted).toBe(true)
+  finishOpen()
+  await opening
+  expect(store.getSnapshot()).toEqual([])
+  expect(run).toHaveBeenCalledOnce()
+  expect(close).toHaveBeenCalledExactlyOnceWith('parent', id)
+})
+
+it('缺少原生侧边栏时不查询，服务恢复后重新启用且通知视图', async () => {
+  const openInSidebar = vi.fn().mockResolvedValue(undefined)
+  const store = new BubbleStore({ run: async () => ({ kind: 'success', text: '回答' }), close: async () => ({ kind: 'success', text: '' }), openInSidebar })
+  const id = await store.ask('parent', '问题')
+  await tick()
+  const previous = store.getSnapshot()
+  const listener = vi.fn()
+  store.subscribe(listener)
+  store.setSidebarAvailable(false)
+  expect(store.getSnapshot()).not.toBe(previous)
+  expect(listener).toHaveBeenCalledOnce()
+  await store.openInSidebar(id)
+  expect(openInSidebar).not.toHaveBeenCalled()
+  expect(store.getSnapshot()[0]?.sidebarError).toContain('未提供')
+  store.setSidebarAvailable(true)
+  await store.openInSidebar(id)
+  expect(openInSidebar).toHaveBeenCalledOnce()
+})
+
 it('满额关闭挂起时五秒返回，迟到释放不会自动提交已拒绝的问题', async () => {
   const run = vi.fn().mockResolvedValue({ kind: 'success', text: '回答' })
   let finishClose!: (value: { kind: 'success'; text: string }) => void

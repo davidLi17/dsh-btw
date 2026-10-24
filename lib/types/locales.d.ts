@@ -44,6 +44,12 @@ export declare const zh: {
     'action.close': string;
     'action.retryClose': string;
     'action.stop': string;
+    'action.openSidebar': string;
+    'status.openingSidebar': string;
+    'error.sidebarUnavailable': string;
+    'error.sidebarOpen': string;
+    'error.sidebarSessionChanged': string;
+    'error.childUnavailable': string;
     'status.answering': string;
     'status.closing': string;
     'command.hint': string;
@@ -91,6 +97,7 @@ export declare const zh: {
     'agent.persona': string;
     'command.internalRun': string;
     'command.internalClose': string;
+    'command.internalChild': string;
 };
 export type MessageKey = keyof typeof zh;
 export type BtwTranslate = Translate<MessageKey>;

@@ -4,6 +4,14 @@ import { normalizeLocale, translate, type BtwLocale } from './locales'
 
 export const RUN_COMMAND = 'btw-run'
 export const CLOSE_COMMAND = 'btw-close'
+/** Read-only lookup of the durable child behind an existing bubble. */
+export const CHILD_COMMAND = 'btw-child'
+
+export interface SideChildAddress {
+  parentSessionId: string
+  childSessionId: string
+  mode: 'continuable'
+}
 
 export interface SideRequest {
   id: string

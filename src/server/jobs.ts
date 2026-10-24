@@ -61,6 +61,13 @@ export class SideJobs {
 
   get size(): number { return this.jobs.size }
 
+  /** Wait for admission, never for the answer and never start a second child. */
+  async waitForStart(scope: string, id: string, signal?: AbortSignal): Promise<void> {
+    const job = this.jobs.get(JSON.stringify([scope, id]))
+    if (!job?.starting) return
+    await this.interruptible(job.starting, signal ? AbortSignal.any([signal, job.controller.signal]) : job.controller.signal)
+  }
+
   ask(scope: string, id: string, question: string, signal?: AbortSignal, context?: unknown, locale: BtwLocale = 'zh'): Promise<SideResult> {
     const key = JSON.stringify([scope, id])
     const t = translate(locale)

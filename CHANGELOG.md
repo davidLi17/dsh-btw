@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.5] - 2026-10-24
+
+- Fix `/recap` availability accessing the input service across an uninjected session scope, which could hide the entire native slash-command list. Resolve the host service through its injected scope and preserve native commands.
+- Match BTW answer typography to the main conversation using the host body renderer and theme tokens, with separately scoped fallback styles. Keep the card toolbar compact.
+- Add “在侧边栏打开” to an existing BTW bubble. Open the exact durable child in the host's native right-side conversation, also used by Better Sidebar, while it is answering or after completion. Keep history, streaming, native drafts and image attachments; opening never sends, reruns or creates another child.
+- Resolve request-to-child ownership on the host after admission, retain passive parent delivery on repeated follow-ups, and leave the existing selected-text-to-sidechat draft action unchanged.
+
 ## [1.2.4] - 2026-10-24
 
 - Rename the npm package identity to `@davidli/dsh-lhg-btw`; update package resolution, client loader/CSS ownership, lock metadata and the release archive name. Preserve Cordis ID `michengai-btw`, configuration and data keys, `/btw`, `/recap`, and original author/license notices. Existing installations require a one-time package migration; the GitHub repository stays unchanged.

@@ -38,6 +38,49 @@ const click = async (label: string) => {
   await act(async () => button!.click())
 }
 
+it('侧边栏按钮文字和 tooltip 精确一致，回答中仍可打开且不会触发 Stop', async () => {
+  const openInSidebar = vi.fn()
+  await act(async () => root.render(React.createElement(BubbleView, {
+    item: { id: 'request01', sessionId: 'session', question: '问题', answer: '', phase: 'answering' },
+    close, openInSidebar, t: translate(), collapsed: false, onToggleCollapse: () => {},
+  })))
+  const button = container.querySelector<HTMLButtonElement>('.btw-action-sidebar')!
+  expect(button.textContent).toBe('在侧边栏打开')
+  expect(button.title).toBe('在侧边栏打开')
+  expect(button.disabled).toBe(false)
+  await click('在侧边栏打开')
+  expect(openInSidebar).toHaveBeenCalledOnce()
+  expect(close).not.toHaveBeenCalled()
+})
+
+it('等待子会话期间禁用重复打开，失败仅在原气泡提示且答案仍保留', async () => {
+  const openInSidebar = vi.fn()
+  const item: Bubble = { id: 'request01', sessionId: 'session', question: '问题', answer: '原回答', phase: 'done', sidebarOpening: true }
+  const props = { item, close, openInSidebar, t: translate(), collapsed: false, onToggleCollapse: () => {} }
+  await act(async () => root.render(React.createElement(BubbleView, props)))
+  const button = container.querySelector<HTMLButtonElement>('.btw-action-sidebar')!
+  expect(button.disabled).toBe(true)
+  expect(button.getAttribute('aria-busy')).toBe('true')
+  expect(container.querySelector('.btw-sidebar-status')?.textContent).toContain('等待旁问就绪')
+  await click('在侧边栏打开')
+  expect(openInSidebar).not.toHaveBeenCalled()
+  await act(async () => root.render(React.createElement(BubbleView, { ...props, item: { ...item, sidebarOpening: false, sidebarError: '尚未就绪，请重试' } })))
+  expect(button.disabled).toBe(false)
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('尚未就绪')
+  expect(container.querySelector('.btw-answer')?.textContent).toContain('原回答')
+})
+
+it('无原生 sidebar 服务时保留不可用说明和禁用入口，不误报已打开', async () => {
+  const openInSidebar = vi.fn()
+  await act(async () => root.render(React.createElement(BubbleView, {
+    item: { id: 'request01', sessionId: 'session', question: '问题', answer: '答案', phase: 'done' },
+    close, openInSidebar, sidebarAvailable: false, t: translate(), collapsed: false, onToggleCollapse: () => {},
+  })))
+  expect(container.querySelector<HTMLButtonElement>('.btw-action-sidebar')?.disabled).toBe(true)
+  expect(container.querySelector('.btw-sidebar-status')?.textContent).toContain('当前宿主未提供')
+  expect(container.querySelector('.btw-answer')?.textContent).toContain('答案')
+})
+
 it('实际 Markdown 渲染拒绝 HTML、脚本链接和远程图片，并保护新窗口链接', async () => {
   await render()
   expect(container.querySelector('script')).toBeNull()

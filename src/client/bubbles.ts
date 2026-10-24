@@ -12,10 +12,14 @@ export interface Bubble {
   phase: 'answering' | 'done' | 'error' | 'closing'
   error?: string
   closeFailed?: boolean
+  sidebarOpening?: boolean
+  sidebarError?: string
 }
 export interface SideTransport {
   run(session: string, id: string, question: string, signal: AbortSignal, reference?: string): Promise<SideResult>
   close(session: string, id: string): Promise<SideResult>
+  /** Reveal the existing child only; never create a child or submit a message. */
+  openInSidebar?(session: string, id: string, signal: AbortSignal): Promise<void>
 }
 
 /** 宿主在进入 handler 前明确拒绝启动；没有后台任务需要清理。 */
@@ -31,10 +35,43 @@ export class BubbleStore {
   private readonly runEnd = new Map<string, 'pending' | 'success' | 'not-started' | 'aborted' | 'failed'>()
   private readonly closeFenced = new Set<string>()
   private readonly admitting = new Set<string>()
+  private readonly sidebarOpening = new Map<string, { controller: AbortController; promise: Promise<void> }>()
+  private sidebarAvailable: boolean
   private disposed = false
-  constructor(private readonly transport: SideTransport, private readonly t: BtwTranslate = translate()) {}
+  constructor(private readonly transport: SideTransport, private readonly t: BtwTranslate = translate()) {
+    this.sidebarAvailable = Boolean(transport.openInSidebar)
+  }
   getSnapshot = (): readonly Bubble[] => this.snapshot
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener) }
+  isSidebarAvailable = (): boolean => this.sidebarAvailable
+  setSidebarAvailable(available: boolean): void {
+    if (available === this.sidebarAvailable) return
+    this.sidebarAvailable = available
+    this.publish([...this.snapshot])
+  }
+
+  openInSidebar(id: string): Promise<void> {
+    const pending = this.sidebarOpening.get(id)
+    if (pending) return pending.promise
+    const item = this.snapshot.find(bubble => bubble.id === id)
+    if (!item || this.disposed || item.phase === 'closing') return Promise.resolve()
+    if (!this.sidebarAvailable || !this.transport.openInSidebar) {
+      this.update(id, { sidebarError: this.t('error.sidebarUnavailable') })
+      return Promise.resolve()
+    }
+    const controller = new AbortController()
+    this.update(id, { sidebarOpening: true, sidebarError: undefined })
+    const promise = Promise.resolve().then(() => {
+      if (!controller.signal.aborted) return this.transport.openInSidebar!(item.sessionId, id, controller.signal)
+    }).catch(error => {
+      if (!controller.signal.aborted) this.update(id, { sidebarError: error instanceof Error ? error.message : String(error) })
+    }).finally(() => {
+      this.sidebarOpening.delete(id)
+      this.update(id, { sidebarOpening: false })
+    })
+    this.sidebarOpening.set(id, { controller, promise })
+    return promise
+  }
 
   /** 返回已接收请求的标识；满额先等待旧气泡关闭，失败时拒绝且不发送新问题。 */
   async ask(sessionId: string, question: string, reference?: string): Promise<string> {
@@ -109,6 +146,7 @@ export class BubbleStore {
     if (existing) return existing
     const item = this.snapshot.find(bubble => bubble.id === id)
     if (!item) return Promise.resolve()
+    this.sidebarOpening.get(id)?.controller.abort()
     if (this.notStarted.has(id)) { this.remove(id); return Promise.resolve() }
     this.update(id, { phase: 'closing', error: undefined, closeFailed: false })
     this.active.get(id)?.abort()

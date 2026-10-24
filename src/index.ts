@@ -9,11 +9,11 @@ import type {} from '@deepseek-ai/dsh-subagent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { PERSONA_PREFIX_SECTION } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
-import { CLOSE_COMMAND, MAX_QUESTION_LENGTH, parseRequest, questionWithReference, RUN_COMMAND } from './shared'
+import { CHILD_COMMAND, CLOSE_COMMAND, MAX_QUESTION_LENGTH, parseRequest, questionWithReference, RUN_COMMAND } from './shared'
 import { DEFAULT_TIMEOUT_MS, SideJobs } from './server/jobs'
 import { translate } from './locales'
 import { hideInternalCommands } from './server/command-visibility'
-import { installSideDelivery, markSideChild } from './server/side-delivery'
+import { installSideDelivery, markSideChild, sideChildAddress } from './server/side-delivery'
 
 export const name = 'michengai-btw'
 export const inject = ['commands', 'subagents', 'tools', 'sessions']
@@ -98,6 +98,9 @@ function applyBtw(ctx: Context): void {
       } finally {
         stopCreated()
       }
+      // Publish the bubble binding only after the host admitted this exact child.
+      // The earlier marker already fenced settlement during the start race.
+      markSideChild(request.context as Agent, childId, request.id)
       return {
         result: activation.result,
         dispose: async () => {
@@ -149,6 +152,25 @@ function applyBtw(ctx: Context): void {
       } catch (error) { return { kind: 'error', text: error instanceof Error ? error.message : translate()('error.request') } }
     },
   }))
+  ctx.effect(() => ctx.commands.register({
+    name: CHILD_COMMAND,
+    description: translate()('command.internalChild'),
+    recordInput: false,
+    handler: async invocation => {
+      const id = invocation.rawInput.trim()
+      if (!/^[a-zA-Z0-9-]{8,80}$/.test(id)) return { kind: 'error', text: translate()('error.id') }
+      try {
+        await jobs.waitForStart(invocation.agent.session.header.id, id, invocation.signal)
+        const address = sideChildAddress(invocation.agent, id)
+        return address
+          ? { kind: 'success', text: JSON.stringify(address) }
+          : { kind: 'error', text: translate()('error.childUnavailable') }
+      } catch (error) {
+        return { kind: 'error', text: error instanceof Error ? error.message : translate()('error.childUnavailable') }
+      }
+    },
+  }))
+
   ctx.effect(() => ctx.commands.register({
     name: CLOSE_COMMAND,
     description: translate()('command.internalClose'),

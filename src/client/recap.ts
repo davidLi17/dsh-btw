@@ -8,10 +8,11 @@ export const RECAP_PROMPT = '1. 对话主线 recap，整理其中信息。\n2. �
 
 /** A native slash action, not a keystroke listener or a system-prompt section. */
 export function applyRecap(ctx: Context): void {
-  ctx.inject(['commandUi'], scope => {
+  ctx.inject(['commandUi', 'sessions', 'conversation'], scope => {
     const commands = scope.get('commandUi')
     if (!commands?.register) return
     const sessions = scope.get('sessions') as unknown as ISessions
+    const conversation = scope.get('conversation')!
     let active = true
     const pending = new Set<() => void>()
     scope.effect(() => () => { active = false; for (const cancel of pending) cancel() })
@@ -19,12 +20,16 @@ export function applyRecap(ctx: Context): void {
       if (sessions.subagentAddress?.(sessionId)) return
       const actx = sessions.scope(sessionId)
       if (!actx) return
-      return { actx, input: actx.conversation.input.for(actx) }
+      // Session scopes are independent fibers, not children of this plugin's
+      // inject scope. Resolve the service here and only pass the session as its target.
+      return { actx, input: conversation.input.for(actx) }
     }
     commands.register({
       name: 'recap',
       description: () => '回顾对话主线，提炼对我最重要的信息并发送',
-      available: session => !!inputFor(session),
+      // The host evaluates all contributions in one candidates() call. Keep
+      // availability read-only: resolving an input here can hide the whole source.
+      available: ({ sessionId }) => !sessions.subagentAddress?.(sessionId) && !!sessions.scope(sessionId),
       ui: {
         kind: 'action',
         // Menu Enter may still be inside Lexical's update; edit after that commit.

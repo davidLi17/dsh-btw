@@ -41,10 +41,10 @@ export function neutralizeMarkdownImages(source: string, emptyAlt = ''): string 
 }
 
 function FallbackMarkdown({ text }: { text: string }): React.JSX.Element {
-  return <Markdown remarkPlugins={[remarkGfm]} skipHtml components={{
+  return <div className="btw-answer-fallback"><Markdown remarkPlugins={[remarkGfm]} skipHtml components={{
     a: props => <a href={props.href} target="_blank" rel="noreferrer noopener">{props.children}</a>,
     img: () => null,
-  }}>{text}</Markdown>
+  }}>{text}</Markdown></div>
 }
 
 class AnswerBoundary extends React.Component<{ fallback: React.ReactNode; children: React.ReactNode }, { failed: boolean }> {
@@ -60,5 +60,5 @@ export function AnswerMarkdown({ text, labels, imageLabel }: { text: string; lab
   const fallback = <FallbackMarkdown text={safe} />
   const Host = loadHostMarkdownText()
   if (!Host) return fallback
-  return <AnswerBoundary key={safe} fallback={fallback}><Host text={safe} streaming={false} labels={labels} variant="compact" /></AnswerBoundary>
+  return <AnswerBoundary key={safe} fallback={fallback}><Host text={safe} streaming={false} labels={labels} variant="body" /></AnswerBoundary>
 }

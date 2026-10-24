@@ -113,10 +113,10 @@ it('子代理 dock 不挂划词旁问，但保留已有气泡的关闭入口', a
   const h = await setup()
   try {
     const names = (session: SessionHint) => h.children(session).map(node => typeof node.type === 'function' ? node.type.name : node.type)
-    expect(names({ sessionId: 'main', subagent: null })).toEqual(['SelectionAsk', 'BubbleDock'])
-    expect(names({ sessionId: 'child', subagent: { address: {} } })).toEqual(['BubbleDock'])
+    expect(names({ sessionId: 'main', subagent: null })).toEqual(['SidebarComposerFocus', 'SelectionAsk', 'BubbleDock'])
+    expect(names({ sessionId: 'child', subagent: { address: {} } })).toEqual(['SidebarComposerFocus', 'BubbleDock'])
     h.rows['old-child'] = { origin: 'subagent' }
-    expect(names({ sessionId: 'old-child' })).toEqual(['BubbleDock'])
+    expect(names({ sessionId: 'old-child' })).toEqual(['SidebarComposerFocus', 'BubbleDock'])
   } finally { await h.ctx.fiber.dispose() }
 })
 

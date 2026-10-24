@@ -15,9 +15,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { MessageCircle } from 'lucide-react'
-import { CLOSE_COMMAND, RUN_COMMAND, type SideResult } from '../shared'
+import { CHILD_COMMAND, CLOSE_COMMAND, RUN_COMMAND, type SideResult } from '../shared'
 import { BubbleStore, SideRequestNotStartedError } from './bubbles'
 import { BubbleDock } from './BubbleView'
+import { createSidebarBridge, mountSidebarBridge, SidebarComposerFocus } from './sidebar'
 import { SelectionAsk } from './SelectionAsk'
 import { createVoiceBridge, mountVoiceBridge, type VoiceBridge } from './voice/service'
 import { CSS } from './styles'
@@ -176,10 +177,15 @@ function applyBtwClient(ctx: Context, bridge: BtwBridge): void {
     if (!response.value) throw new Error(t('error.backend'))
     return { kind: response.value.result.kind, text: response.value.result.text ?? '' }
   }
+  const sidebar = createSidebarBridge(sessions, execute, t, ctx.conversation.input)
   const store = new BubbleStore({
     run: (session, id, question, signal, reference) => execute(session, `/${RUN_COMMAND} ${JSON.stringify({ id, question, reference, locale: normalizeLocale(t('locale.id')) })}`, signal),
     close: (session, id) => execute(session, `/${CLOSE_COMMAND} ${id}`),
+    openInSidebar: sidebar.openInSidebar,
   }, t)
+  store.setSidebarAvailable(sidebar.getSnapshot().available)
+  ctx.effect(() => sidebar.subscribe(() => store.setSidebarAvailable(sidebar.getSnapshot().available)))
+  mountSidebarBridge(ctx, sidebar)
 
   const voice = createVoiceBridge()
   mountVoiceBridge(ctx, voice)
@@ -216,11 +222,11 @@ function applyBtwClient(ctx: Context, bridge: BtwBridge): void {
   ctx.effect(() => () => store.dispose())
 
   function Dock(props: PropsRuntime<'conversation.input.dock'> & { t: BtwTranslate }): React.JSX.Element {
-    return <>{!props.session.subagent && !isSubagent(props.session.sessionId) && <SelectionAsk key={props.session.sessionId} store={store} sessionId={props.session.sessionId} t={props.t} voice={voice} />}<BubbleDock store={store} sessionId={props.session.sessionId} t={props.t} /></>
+    return <><SidebarComposerFocus bridge={sidebar} sessionId={props.session.sessionId} />{!props.session.subagent && !isSubagent(props.session.sessionId) && <SelectionAsk key={props.session.sessionId} store={store} sessionId={props.session.sessionId} t={props.t} voice={voice} />}<BubbleDock store={store} sessionId={props.session.sessionId} t={props.t} /></>
   }
   slots.inject('conversation.input.dock', () => slots.register({ name: 'conversation.input.dock', id: 'michengai-btw', order: -50, locale: NS }, Dock))
   slots.inject('conversation.chat.commandview', () => {
-    const off = [RUN_COMMAND, CLOSE_COMMAND].map(key => slots.register({ name: 'conversation.chat.commandview', key }, () => null))
+    const off = [RUN_COMMAND, CLOSE_COMMAND, CHILD_COMMAND].map(key => slots.register({ name: 'conversation.chat.commandview', key }, () => null))
     return () => off.forEach(dispose => dispose())
   })
 }

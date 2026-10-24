@@ -12,6 +12,40 @@ const tick = () => new Promise<void>(resolve => setImmediate(resolve))
 afterEach(() => { vi.useRealTimers() })
 
 describe('一次性旁问生命周期', () => {
+  it('打开仅等待原请求启动，不等待回答、不创建任务，且按父会话隔离', async () => {
+    const starting = deferred<ChildRun>()
+    const pending = deferred<typeof answer>()
+    const start = vi.fn<StartChild>(() => starting.promise)
+    const jobs = new SideJobs(start)
+    const run = jobs.ask('parent', 'request01', 'A')
+    const ready = vi.fn()
+    const lookup = jobs.waitForStart('parent', 'request01').then(ready)
+    await jobs.waitForStart('other', 'request01')
+    await tick()
+    expect(ready).not.toHaveBeenCalled()
+    starting.resolve({ result: pending.promise, dispose: async () => {} })
+    await lookup
+    expect(ready).toHaveBeenCalledOnce()
+    expect(jobs.size).toBe(1)
+    expect(start).toHaveBeenCalledOnce()
+    pending.resolve(answer)
+    await run
+    await jobs.waitForStart('parent', 'request01')
+    expect(start).toHaveBeenCalledOnce()
+  })
+
+  it('取消打开等待不会取消原旁问', async () => {
+    const starting = deferred<ChildRun>()
+    const jobs = new SideJobs(() => starting.promise)
+    const run = jobs.ask('parent', 'request01', 'A')
+    const controller = new AbortController()
+    const lookup = jobs.waitForStart('parent', 'request01', controller.signal)
+    controller.abort(new Error('view closed'))
+    await expect(lookup).rejects.toThrow('view closed')
+    starting.resolve({ result: Promise.resolve(answer), dispose: async () => {} })
+    expect(await run).toEqual({ kind: 'success', text: '答案' })
+  })
+
   it.each(['zh', 'en'] as const)('关闭失败返回本地化提示，原始错误记日志且保留额度（%s）', async locale => {
     const dispose = vi.fn().mockRejectedValue(new Error('provider internal failure'))
     const onError = vi.fn()

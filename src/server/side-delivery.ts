@@ -1,18 +1,32 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { appendPluginRecord, pluginRecordOf, type SessionId } from '@deepseek-ai/dsh-session'
+import type { SideChildAddress } from '../shared'
 
 const CHILD_RECORD = 'plugin:michengai-btw/child'
 
 declare module '@deepseek-ai/dsh-session' {
   interface PluginRecordMap {
-    'plugin:michengai-btw/child': { parentId: string; childId: string }
+    'plugin:michengai-btw/child': { parentId: string; childId: string; requestId?: string }
   }
 }
 
 /** Result routing belongs to the durable conversation, not its first activation. */
-export function markSideChild(parent: Agent, childId: SessionId): void {
-  appendPluginRecord(parent.session, CHILD_RECORD, { parentId: parent.id, childId })
+export function markSideChild(parent: Agent, childId: SessionId, requestId?: string): void {
+  appendPluginRecord(parent.session, CHILD_RECORD, { parentId: parent.id, childId, ...(requestId === undefined ? {} : { requestId }) })
+}
+
+/** Only the exact parent's own successful admission record can address a child. */
+export function sideChildAddress(parent: Agent, requestId: string): SideChildAddress | undefined {
+  for (const event of parent.session.ownEvents()) {
+    const record = pluginRecordOf(event)
+    if (record?.type !== CHILD_RECORD) continue
+    const data = record.data as { parentId?: unknown; requestId?: unknown; childId?: unknown } | null
+    if (data?.parentId === parent.id && data.requestId === requestId && typeof data.childId === 'string') {
+      return { parentSessionId: parent.id, childSessionId: data.childId, mode: 'continuable' }
+    }
+  }
+  return undefined
 }
 
 export function installSideDelivery(ctx: Context): () => void {

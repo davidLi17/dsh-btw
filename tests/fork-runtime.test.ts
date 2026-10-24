@@ -12,12 +12,13 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { expect, it } from 'vitest'
 import * as sourcePlugin from '../src/index'
-import { CLOSE_COMMAND, RUN_COMMAND } from '../src/shared'
+import { CHILD_COMMAND, CLOSE_COMMAND, RUN_COMMAND } from '../src/shared'
 
 // 仅模型输出可控；AgentLoop、fork、命令、工具限制和生命周期均使用真实宿主。
 class AnswerAdapter extends LlmAdapter {
   requests: GenerateOptions[] = []
   hang = false
+  gate?: Promise<void>
   async resolveModel(provider: string, model: string) { return { provider, id: model, name: model } }
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     this.requests.push(options)
@@ -29,8 +30,11 @@ class AnswerAdapter extends LlmAdapter {
       return
     }
     const text = this.requests.length === 1 ? '主任务背景已确认' : '独立旁问答案'
+    const gate = this.gate
+    this.gate = undefined
     yield { type: 'block-start', index: 0, blockType: 'text' }
     yield { type: 'text-delta', index: 0, text }
+    if (gate) await gate
     yield { type: 'block-end', index: 0, block: { type: 'text', text } }
     yield { type: 'finish', reason: { kind: 'stop' } }
   }
@@ -104,10 +108,20 @@ it('真实 fork 继承已完成上下文、独立回答并可取消，主任务�
     expect(JSON.stringify(parent.session.deriveMessages())).not.toContain('独立旁问答案')
     expect(JSON.stringify(parent.session.deriveMessages())).not.toContain('选中时固定的正文片段')
     await expect.poll(() => ctx.agents.list().length).toBe(1)
+    const resolved = await execute(`/${CHILD_COMMAND} request01`)
+    expect(resolved?.result.kind).toBe('success')
+    const address = JSON.parse(resolved!.result.text!)
+    expect(address).toMatchObject({ parentSessionId: parent.id, mode: 'continuable' })
+    expect(records.get(address.childSessionId)?.header.origin).toBe('subagent')
+    expect((await execute(`/${CHILD_COMMAND} unknown-request`))?.result.kind).toBe('error')
 
     adapter.hang = true
     const pending = execute(`/${RUN_COMMAND} ${JSON.stringify({ id: 'request02', question: '等待取消' })}`)
     await expect.poll(() => adapter.requests.length).toBe(3)
+    const liveAddress = JSON.parse((await execute(`/${CHILD_COMMAND} request02`))!.result.text!)
+    expect(liveAddress.childSessionId).not.toBe(address.childSessionId)
+    expect(ctx.agents.get(liveAddress.childSessionId)).toBeDefined()
+    expect(adapter.requests).toHaveLength(3) // opening while running did not rerun
     expect((await execute(`/${CLOSE_COMMAND} request02`))?.result.kind).toBe('success')
     expect((await pending)?.result.kind).toBe('error')
     await expect.poll(() => ctx.agents.list().length).toBe(1)
@@ -118,7 +132,7 @@ it('真实 fork 继承已完成上下文、独立回答并可取消，主任务�
     expect(adapter.requests).toHaveLength(4)
 
     // Reopen the *completed and disposed* original BTW child through the browser API.
-    const childId = [...records.values()].find(row => row.header.origin === 'subagent')!.header.id
+    const childId = SessionId(address.childSessionId)
     expect(ctx.agents.get(childId)).toBeUndefined()
     const parentTurns = parent.session.ownEvents().filter(event => event.type === 'turn/start').length
     await ctx.subagents.prompt({ parentSessionId: parent.id, childSessionId: childId,
@@ -131,6 +145,33 @@ it('真实 fork 继承已完成上下文、独立回答并可取消，主任务�
     expect(parent.session.ownEvents().filter(event => event.type === 'turn/start')).toHaveLength(parentTurns)
     expect(ctx.agents.get(childId)).toBeUndefined() // resumed activation also cleaned up
     expect(parent.inbox.nextStep.some(message => message.source?.kind === 'subagent-settled')).toBe(true)
+    await ctx.subagents.prompt({ parentSessionId: parent.id, childSessionId: childId,
+      requestId: 'side-followup-again' as never, mode: 'continuable', delivery: 'queue', content: [{ type: 'text', text: '再追问一次，同一旁问继续' }],
+    }, new AbortController().signal)
+    await ctx.subagents.waitForChildren(parent)
+    expect(adapter.requests).toHaveLength(6)
+    expect(parent.session.ownEvents().filter(event => event.type === 'turn/start')).toHaveLength(parentTurns)
+    expect(JSON.parse((await execute(`/${CHILD_COMMAND} request01`))!.result.text!)).toEqual(address)
+    expect([...records.values()].filter(row => row.header.origin === 'subagent')).toHaveLength(2)
+    // A continuation queued while the initial answer is streaming stays in
+    // the same activation; BTW's final cleanup must not discard it.
+    let release = () => {}
+    adapter.gate = new Promise<void>(resolve => { release = resolve })
+    const streaming = execute(`/${RUN_COMMAND} ${JSON.stringify({ id: 'request03', question: '流式旁问' })}`)
+    try {
+      await expect.poll(() => adapter.requests.length).toBe(7)
+      const streamingAddress = JSON.parse((await execute(`/${CHILD_COMMAND} request03`))!.result.text!)
+      await ctx.subagents.prompt({ ...streamingAddress, requestId: 'queued-side-followup' as never,
+        delivery: 'queue', content: [{ type: 'text', text: '等回答结束后继续这一条' }],
+      }, new AbortController().signal)
+      expect(adapter.requests).toHaveLength(7)
+      release()
+      expect((await streaming)?.result.kind).toBe('success')
+      expect(adapter.requests).toHaveLength(8)
+      expect(JSON.stringify(adapter.requests.at(-1)!.messages)).toContain('等回答结束后继续这一条')
+      expect(parent.session.ownEvents().filter(event => event.type === 'turn/start')).toHaveLength(parentTurns)
+      expect([...records.values()].filter(row => row.header.origin === 'subagent')).toHaveLength(3)
+    } finally { release() }
     await plugin.dispose()
   } finally { await ctx.fiber.dispose() }
 }, 15_000)

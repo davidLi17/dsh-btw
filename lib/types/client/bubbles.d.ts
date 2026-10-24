@@ -9,10 +9,14 @@ export interface Bubble {
     phase: 'answering' | 'done' | 'error' | 'closing';
     error?: string;
     closeFailed?: boolean;
+    sidebarOpening?: boolean;
+    sidebarError?: string;
 }
 export interface SideTransport {
     run(session: string, id: string, question: string, signal: AbortSignal, reference?: string): Promise<SideResult>;
     close(session: string, id: string): Promise<SideResult>;
+    /** Reveal the existing child only; never create a child or submit a message. */
+    openInSidebar?(session: string, id: string, signal: AbortSignal): Promise<void>;
 }
 /** 宿主在进入 handler 前明确拒绝启动；没有后台任务需要清理。 */
 export declare class SideRequestNotStartedError extends Error {
@@ -29,10 +33,15 @@ export declare class BubbleStore {
     private readonly runEnd;
     private readonly closeFenced;
     private readonly admitting;
+    private readonly sidebarOpening;
+    private sidebarAvailable;
     private disposed;
     constructor(transport: SideTransport, t?: BtwTranslate);
     getSnapshot: () => readonly Bubble[];
     subscribe: (listener: () => void) => (() => void);
+    isSidebarAvailable: () => boolean;
+    setSidebarAvailable(available: boolean): void;
+    openInSidebar(id: string): Promise<void>;
     /** 返回已接收请求的标识；满额先等待旧气泡关闭，失败时拒绝且不发送新问题。 */
     ask(sessionId: string, question: string, reference?: string): Promise<string>;
     close(id: string): Promise<void>;

@@ -2,6 +2,13 @@ export { MAX_QUESTION_LENGTH, MAX_REFERENCE_LENGTH } from './limits';
 import { type BtwLocale } from './locales';
 export declare const RUN_COMMAND = "btw-run";
 export declare const CLOSE_COMMAND = "btw-close";
+/** Read-only lookup of the durable child behind an existing bubble. */
+export declare const CHILD_COMMAND = "btw-child";
+export interface SideChildAddress {
+    parentSessionId: string;
+    childSessionId: string;
+    mode: 'continuable';
+}
 export interface SideRequest {
     id: string;
     question: string;

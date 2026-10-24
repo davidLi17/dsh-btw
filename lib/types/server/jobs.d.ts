@@ -40,6 +40,8 @@ export declare class SideJobs {
     private idleNotified;
     constructor(start: StartChild, timeoutMs?: number, options?: JobOptions);
     get size(): number;
+    /** Wait for admission, never for the answer and never start a second child. */
+    waitForStart(scope: string, id: string, signal?: AbortSignal): Promise<void>;
     ask(scope: string, id: string, question: string, signal?: AbortSignal, context?: unknown, locale?: BtwLocale): Promise<SideResult>;
     /** 关闭可先于启动到达；短期墓碑阻止网络乱序重新启动请求。 */
     close(scope: string, id: string): Promise<SideResult>;

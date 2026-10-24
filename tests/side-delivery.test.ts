@@ -3,7 +3,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { expect, it, vi } from 'vitest'
-import { installSideDelivery, markSideChild } from '../src/server/side-delivery'
+import { installSideDelivery, markSideChild, sideChildAddress } from '../src/server/side-delivery'
 
 const notice = (child: string) => createUserMessage({
   source: { kind: 'subagent-settled', form: 'notice', summary: 'Done', senderSessionId: SessionId(child) },
@@ -70,4 +70,19 @@ it('does not adopt routing records inherited by another fork', async () => {
   expect(original).toHaveBeenCalledWith(message, 'next-turn', true)
   dispose()
   await ctx.fiber.dispose()
+})
+
+it('resolves only the admitted request of its exact parent, including after restore', () => {
+  const before = parent()
+  markSideChild(before, SessionId('still-starting'))
+  markSideChild(before, SessionId('original-child'), 'request01')
+  expect(sideChildAddress(before, 'request01')).toEqual({ parentSessionId: before.id, childSessionId: 'original-child', mode: 'continuable' })
+  expect(sideChildAddress(before, 'still-starting')).toBeUndefined()
+  expect(sideChildAddress(before, 'missing-request')).toBeUndefined()
+  const events = before.session.snapshotEvents()
+  const restored = parent(Session.fromRestore(before.id, events, before.session.header, SessionLogOffset(0), 'shared-frozen'))
+  expect(sideChildAddress(restored, 'request01')).toEqual(sideChildAddress(before, 'request01'))
+  const fork = parent(Session.create(SessionId('another-parent'), events, { ...before.session.header, id: SessionId('another-parent'), isSeeded: true, parentSession: before.id }, SessionLogOffset(events.length)))
+  expect(sideChildAddress(fork, 'request01')).toBeUndefined()
+  expect(restored.session.deriveMessages()).toEqual([])
 })

@@ -20,25 +20,33 @@ export const CSS = `
 .btw-selection-modal .btw-reference{padding:0}
 .btw-dock{display:flex;flex:none;flex-direction:column;gap:8px;width:calc(100% - var(--dsh-composer-side-clearance,0px) - var(--dsh-composer-side-clearance,0px));max-width:var(--dsh-composer-card-max-width,100%);margin:0 auto;max-height:440px;overflow:auto;padding:4px 0 10px;box-sizing:border-box;letter-spacing:0}
 .btw-bubble{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-l2);border-radius:12px;min-width:0;flex-shrink:0;font-size:13px;line-height:1.6;font-family:var(--dsw-font-family,inherit);letter-spacing:0}
-.btw-header{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 14px;min-width:0;min-height:44px}
+.btw-header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px 8px 14px;min-width:0;min-height:44px}
 .btw-symbol{display:flex;align-items:center;color:var(--dsw-alias-label-secondary);height:28px;flex-shrink:0}
 .btw-question{flex:1;min-width:0;overflow-wrap:anywhere;font-size:13px;font-weight:500;line-height:22px;max-height:66px;overflow:auto}
-.btw-actions{display:flex;gap:4px;flex-shrink:0}
+.btw-actions{display:flex;flex-wrap:wrap;align-items:center;gap:4px;flex-shrink:0;max-width:100%;margin-left:auto}
 .btw-actions button{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;flex:none;transition:background-color 120ms ease}
+.btw-actions button.btw-action-sidebar{display:inline-flex;align-items:center;justify-content:center;gap:5px;box-sizing:border-box;width:auto;max-width:100%;min-width:0;height:auto;min-height:28px;padding:4px 8px;border-radius:6px;font:inherit;font-size:12px;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
+.btw-action-sidebar svg{flex-shrink:0}
 .btw-actions button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
 .btw-actions button:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,var(--dsw-alias-label-primary));outline-offset:-2px}
 .btw-actions button.btw-action-stop{color:var(--dsw-alias-state-error-primary,var(--dsw-alias-label-primary))}
 .btw-actions button.btw-action-stop:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-state-error-primary,var(--dsw-alias-label-primary))}
 .btw-actions button:disabled{cursor:wait;opacity:.5}
 .btw-status{display:flex;align-items:center;gap:8px;padding:0 14px 12px;color:var(--dsw-alias-label-secondary);font-size:13px}
+.btw-sidebar-status{display:flex;align-items:center;gap:6px;margin:0;padding:0 14px 12px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.btw-sidebar-status svg{flex-shrink:0}
 .btw-spinner{animation:btw-spin 1.2s linear infinite}@keyframes btw-spin{to{transform:rotate(360deg)}}
-.btw-answer{padding:0 14px 14px;max-height:300px;overflow:auto;overflow-wrap:anywhere;font-size:13px;line-height:1.7}
-.btw-answer>*:first-child{margin-top:0}.btw-answer>*:last-child{margin-bottom:0}
-.btw-answer p{margin:8px 0}.btw-answer h1,.btw-answer h2,.btw-answer h3{font-size:15px;line-height:1.5;margin:12px 0 6px;font-weight:600}
-.btw-answer pre{max-width:100%;overflow:auto;background:var(--dsw-alias-markdown-code-block);padding:10px;border-radius:8px;white-space:pre;font-size:12px}.btw-answer .katex-display{max-width:100%;overflow:auto}
-.btw-answer code{font-family:Consolas,monospace;font-size:12px}.btw-answer :not(pre)>code{background:var(--dsw-alias-markdown-code-block);border-radius:4px;padding:1px 3px}.btw-answer a{color:var(--dsw-alias-label-primary);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
-.btw-answer table{display:block;max-width:100%;overflow:auto;border-collapse:collapse}.btw-answer th,.btw-answer td{border:1px solid var(--dsw-alias-border-l2);padding:5px 9px}
-.btw-answer ul,.btw-answer ol{padding-left:22px}.btw-answer blockquote{margin:8px 0;padding-left:10px;border-left:2px solid var(--dsw-alias-border-l4);color:var(--dsw-alias-label-secondary)}
+.btw-answer{padding:0 14px 14px;max-height:300px;overflow:auto;overflow-wrap:anywhere}
+/* 宿主正文变体自行控制 Markdown 排版；以下样式只用于宿主缺失或失败时的回退。 */
+.btw-answer-fallback{min-width:0;font:var(--dsw-font-markdown-base,16px/1.6 sans-serif);color:var(--dsw-alias-label-primary)}
+.btw-answer-fallback>*:first-child{margin-top:0}.btw-answer-fallback>*:last-child{margin-bottom:0}
+.btw-answer-fallback p{margin:16px 0}.btw-answer-fallback strong{font-weight:600}
+.btw-answer-fallback h1{font:var(--dsw-font-markdown-h1,600 1.5em/1.5 sans-serif);margin:32px 0 16px}.btw-answer-fallback h2{font:var(--dsw-font-markdown-h2,600 1.25em/1.5 sans-serif);margin:32px 0 16px}.btw-answer-fallback h3{font:var(--dsw-font-markdown-h3,600 1.125em/1.5 sans-serif);margin:32px 0 16px}
+.btw-answer-fallback h4{font:var(--dsw-font-markdown-h4,600 1em/1.5 sans-serif);margin:16px 0}.btw-answer-fallback h5,.btw-answer-fallback h6{font:var(--dsw-font-markdown-base-strong,600 1em/1.6 sans-serif);margin:16px 0}
+.btw-answer-fallback pre{max-width:100%;overflow:auto;background:var(--dsw-alias-markdown-code-block);margin:16px 0;padding:10px;border-radius:8px;white-space:pre}.btw-answer-fallback code{font-family:var(--ds-font-family-code,Consolas,monospace);font-size:.875em}
+.btw-answer-fallback :not(pre)>code{background:var(--dsw-alias-markdown-inline-code);border-radius:4px;padding:1px 3px}.btw-answer-fallback a{color:var(--dsw-alias-link);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.btw-answer-fallback table{display:block;max-width:100%;overflow:auto;border-collapse:collapse}.btw-answer-fallback th,.btw-answer-fallback td{border:1px solid var(--dsw-alias-border-l2);padding:5px 9px}
+.btw-answer-fallback ul,.btw-answer-fallback ol{margin:16px 0;padding-left:18px}.btw-answer-fallback blockquote{margin:16px 0;padding-left:14px;border-left:2px solid var(--dsw-alias-label-caption)}
 .btw-error{margin:0;padding:0 14px 12px;font-size:13px;color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}
 .btw-quote-dock{position:relative;display:flex;flex-direction:column;align-items:flex-start;width:calc(100% - var(--dsh-composer-side-clearance,0px) - var(--dsh-composer-side-clearance,0px));max-width:var(--dsh-composer-card-max-width,100%);margin:0 auto;padding:4px 0 6px;box-sizing:border-box}
 .btw-codex-pill{display:inline-flex;align-items:center;height:28px;padding:0 4px 0 10px;gap:6px;border-radius:9999px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l2);box-shadow:var(--dsw-shadow-lv1,0 1px 3px rgba(0,0,0,0.06));font-size:12px;font-weight:500;color:var(--dsw-alias-label-primary);cursor:pointer;transition:background-color 140ms ease,border-color 140ms ease;-webkit-user-select:none;user-select:none}
@@ -68,7 +76,7 @@ export const CSS = `
 .btw-codex-card-body blockquote{margin:0;padding-left:8px;border-left:2px solid var(--dsw-alias-border-l2);font-size:12px;line-height:1.5;color:var(--dsw-alias-label-primary);white-space:pre-wrap;overflow-wrap:anywhere;max-height:96px;overflow:hidden}
 .btw-anchor-highlight{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px;animation:btw-pulse 1.6s ease-out}
 @keyframes btw-pulse{0%{background-color:var(--dsw-alias-interactive-bg-hover-accent,rgba(59,130,246,0.2))}100%{background-color:transparent}}
-@media(max-width:480px){.btw-dock{max-height:330px}.btw-header{padding:6px 8px 6px 12px;gap:6px}.btw-answer{padding:0 12px 12px;max-height:230px}.btw-status,.btw-error{padding-left:12px}.btw-actions{gap:0}.btw-actions button{width:36px;height:36px}}
+@media(max-width:480px){.btw-dock{max-height:330px}.btw-header{padding:6px 8px 6px 12px;gap:6px}.btw-answer{padding:0 12px 12px;max-height:230px}.btw-status,.btw-sidebar-status,.btw-error{padding-left:12px}.btw-actions{gap:0}.btw-actions button{width:36px;height:36px}.btw-actions button.btw-action-sidebar{min-height:36px}}
 @media(prefers-reduced-motion:reduce){.btw-spinner{animation:none}.btw-actions button{transition:none}}
 
 .btw-voice { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
